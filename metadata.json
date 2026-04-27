@@ -1,0 +1,6 @@
+{
+  "name": "5250 RPA Robot",
+  "description": "A YAML-driven RPA tool for automating TN5250 terminal sessions via tmux.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

@@ -1,0 +1,58 @@
+name: "Sample Login Script"
+description: "Logs into a TN5250 session and checks the main menu"
+tmux_session: "5250_robot"
+
+steps:
+  - type: "wait_for_text"
+    text: "Sign On"
+    description: "Wait for the sign-on screen"
+    timeout_seconds: 20
+
+  - type: "send_text"
+    text: "${USERNAME}"
+    description: "Enter user name"
+
+  - type: "send_key"
+    key: "Tab"
+    description: "Move to password field"
+
+  - type: "send_text"
+    text: "${PASSWORD}"
+    description: "Enter password"
+  
+  - type: "send_key"
+    key: "Enter"
+    description: "Submit sign-on"
+
+  - type: "press_key_if_text_present"
+    text: "Sign On Information"
+    key: "Enter"
+    description: "Acknowledge optional Sign On Information display"
+
+  - type: "wait_for_text"
+    text: "MAIN MENU"
+    description: "Ensure we reached the main menu at top"
+    row: 1
+    col: 28
+
+  - type: "wait_for_text"
+    text: "Selection or command"
+    description: "Check for prompt in a specific block"
+    row: 19
+    col: 1
+    end_row: 21
+    end_col: 40
+
+  - type: "wait_for_text"
+    text: "CPF"
+    is_message_line: true
+    description: "Listen for dynamic error messages on the status line"
+    timeout_seconds: 5
+
+  - type: "send_key"
+    key: "F3"
+    description: "Exit session"
+
+  - type: "capture"
+    filename: "last_screen.txt"
+    description: "Save final state"

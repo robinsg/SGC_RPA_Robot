@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "name": "5250 Coordinate System",
+      "description": "5250 coordinates are 1-indexed (Row 1-24/27, Col 1-80/132). Always verify coordinates against standard IBM i layouts.",
+      "pattern": "**/*.yaml"
+    },
+    {
+      "name": "YAML Action Schema",
+      "description": "Valid actions: wait_for_text, send_text, send_key, sleep, capture, press_key_if_text_present. Check src/robot/schema.ts before adding new ones.",
+      "pattern": "**/*.yaml"
+    },
+    {
+      "name": "Tmux Session Safety",
+      "description": "Always check if the tmux session defined in the YAML exists before attempting to send keys or capture content.",
+      "pattern": "src/robot/**/*.ts"
+    }
+  ]
+}
