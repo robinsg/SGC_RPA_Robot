@@ -9,12 +9,11 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-# Convert LPAR name to lower case and export it as TN5250_HOST
+# Capture the LPAR name from the command line argument.
 LPAR_NAME_LOWER=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-export TN5250_HOST=$LPAR_NAME_LOWER
 
 # Load the environment file specific to the host
-ENV_FILE=".env.${TN5250_HOST}"
+ENV_FILE=".env.${LPAR_NAME_LOWER}"
 if [ -f "$ENV_FILE" ]; then
   echo "Loading environment variables from $ENV_FILE"
   # allexport ensures all variables in the sourced file are exported
@@ -26,14 +25,21 @@ else
   exit 1
 fi
 
-# --- Variable Defaults ---
-# Default values for TN5250 config, can be overridden by the .env file
+# --- Variable Assignment & Integrity ---
+# The command-line LPAR name is the source of truth for the host.
+# Re-export it to prevent the .env file from overriding it.
+export TN5250_HOST=$LPAR_NAME_LOWER
+
 # The second argument is the YAML file, defaulting to example_script.yaml
 YAML_FILE=${2:-"example_script.yaml"}
-TN5250_MAP=${TN5250_MAP:-"23"}
+
+# Unconditionally set the session name based on the host. This prevents
+# a value from the .env file from causing a mismatch.
+TMUX_SESSION="robot-${TN5250_HOST}"
+
+# --- TN5250 Parameter Setup ---
+TN5250_MAP=${TN5250_MAP:-"285"}
 TN5250_DEVICE_TYPE=${TN5250_DEVICE_TYPE:-"IBM-3477-FC"}
-# TN5250_DEVICE_NAME is optional and read from the env file if present.
-TMUX_SESSION=${TMUX_SESSION:-"robot-${TN5250_HOST}"} # Host-specific session name
 
 TN5250_SSL_FLAG=""
 if [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
@@ -46,8 +52,11 @@ if ! command -v tmux &> /dev/null; then
     exit 1
 fi
 
+# Track if this script instance created the session
+SESSION_CREATED_BY_SCRIPT=false
 # Check if session exists, if not, start it
 if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    SESSION_CREATED_BY_SCRIPT=true
     echo "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
     
     # Build the tn5250 command arguments dynamically
@@ -62,24 +71,43 @@ if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
         TN_CMD_ARGS+=("$TN5250_SSL_FLAG")
     fi
     
+    # The host must be the last argument for tn5250
     TN_CMD_ARGS+=("$TN5250_HOST")
     
     FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
     echo "Executing: $FULL_CMD"
     tmux new-session -d -s "$TMUX_SESSION" "$FULL_CMD"
     
-    # Give it a moment to initialize before the robot tries to connect
-    echo "Waiting for session to initialize..."
-    sleep 2
+    # Robustness Check: Wait a moment and verify the session started.
+    # If the tn5250 command failed (e.g., bad hostname), the session will die instantly.
+    sleep 1
+    if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        echo "Error: Failed to start tmux session '$TMUX_SESSION'."
+        echo "This is often caused by an invalid hostname or tn5250 command error."
+        echo "Please check the hostname in your .env file and the tn5250 installation."
+        exit 1
+    fi
+    echo "Session started successfully."
 fi
 
 # Export the session name so the robot knows which session to target
 export TMUX_SESSION
 
-# Run the robot engine
+# Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
+set +e
 echo "--- Starting RPA Automation ---"
 npx tsx src/robot/cli.ts "$YAML_FILE"
 EXIT_CODE=$?
+set -e # Re-enable exit on error
+
 echo "--- Robot Finished ---"
+
+# --- Cleanup ---
+# If the script failed AND this script was the one that created the session, kill it.
+if [ "$EXIT_CODE" -ne 0 ] && [ "$SESSION_CREATED_BY_SCRIPT" = true ]; then
+    echo "Robot failed with exit code $EXIT_CODE. Terminating tmux session '$TMUX_SESSION'..."
+    tmux kill-session -t "$TMUX_SESSION"
+    echo "Session terminated."
+fi
 
 exit $EXIT_CODE

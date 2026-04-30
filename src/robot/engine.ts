@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
@@ -21,29 +21,27 @@ export class RobotEngine {
     );
 
     this.script = RobotScriptSchema.parse(processedData);
-    this.session = this.script.tmux_session;
+    // Use the session name from the environment variable, falling back to the script's definition
+    this.session = process.env.TMUX_SESSION || this.script.tmux_session;
     this.host = process.env.TN5250_HOST || 'unknown_host';
   }
 
   private runTmux(args: string[]): string {
-    try {
-      return execSync(`tmux ${args.join(' ')}`).toString();
-    } catch (error: any) {
-      // If session doesn't exist and we're not trying to create it, that might be an error
-      if (error.message.includes('can\'t find session')) {
-        throw new Error(`Tmux session '${this.session}' not found. Please start it first.`);
-      }
-      throw error;
+    const result = spawnSync('tmux', args, { encoding: 'utf-8' });
+
+    if (result.status !== 0) {
+      // Provide a more detailed error message
+      const errorOutput = result.stderr || result.stdout || 'No output';
+      throw new Error(`Tmux command failed: [tmux ${args.join(' ')}]. Error: ${errorOutput.trim()}`);
     }
+    
+    return result.stdout;
   }
 
   private checkSessionExists(): boolean {
-    try {
-      execSync(`tmux has-session -t ${this.session} 2>/dev/null`);
-      return true;
-    } catch {
-      return false;
-    }
+    const result = spawnSync('tmux', ['has-session', '-t', this.session]);
+    // 'has-session' returns 0 if it exists, and a non-zero status if it doesn't.
+    return result.status === 0;
   }
 
   async run() {
@@ -63,9 +61,11 @@ export class RobotEngine {
 
       switch (step.type) {
         case 'send_text':
-          this.runTmux(['send-keys', '-t', this.session, `"${step.text}"`]);
+          // Use the -l flag to send the text literally, preventing shell interpolation.
+          this.runTmux(['send-keys', '-l', '-t', this.session, step.text]);
           break;
         case 'send_key':
+          // Keys are not sent literally.
           this.runTmux(['send-keys', '-t', this.session, step.key]);
           break;
         case 'sleep':
