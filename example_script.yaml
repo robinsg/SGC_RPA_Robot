@@ -19,35 +19,50 @@ steps:
   - type: "send_text"
     text: "${PASSWORD}"
     description: "Enter password"
+
+  - type: "sleep"
+    seconds: 0.5
+    description: "Pause briefly before submitting"   
   
   - type: "send_key"
     key: "Enter"
     description: "Submit sign-on"
+
+  - type: "capture"
+    filename: "debug_signon"
+    description: "Capture the screen just after sign in sumitted"
+
 
   - type: "press_key_if_text_present"
     text: "Sign On Information"
     key: "Enter"
     description: "Acknowledge optional Sign On Information display"
 
+  - type: "capture"
+    filename: "debug_signon_onfo"
+    description: "Capture the screen just after sign in Information"
+
+
   - type: "wait_for_text"
-    text: "MAIN MENU"
-    description: "Ensure we reached the main menu at top"
+    text: "IBM i Main Menu"
+    description: "Ensure we reached the main menu"
     row: 1
-    col: 28
+    col: 33
+    timeout_seconds: 10 # It's good practice to have a timeout to prevent infinite hangs
 
   - type: "wait_for_text"
     text: "Selection or command"
     description: "Check for prompt in a specific block"
     row: 19
-    col: 1
+    col: 2
     end_row: 21
     end_col: 40
 
-  - type: "wait_for_text"
-    text: "CPF"
-    is_message_line: true
-    description: "Listen for dynamic error messages on the status line"
-    timeout_seconds: 5
+#  - type: "wait_for_text"
+#    text: "CPF"
+#    is_message_line: true
+#    description: "Listen for dynamic error messages on the status line"
+#    timeout_seconds: 5
 
   - type: "send_key"
     key: "F3"
@@ -56,3 +71,4 @@ steps:
   - type: "capture"
     filename: "last_screen.txt"
     description: "Save final state"
+
