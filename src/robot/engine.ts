@@ -110,18 +110,21 @@ export class RobotEngine {
           const keyToSend = KEY_MAP[step.key] || step.key;
           logger.debug(`[Key Send] Sending key: '${step.key}' -> tmux: '${keyToSend}'`);
 
-          if (step.key === 'Enter' && logLevel === 'debug') {
+          if (logLevel === 'debug') {
             const beforeContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
-            logger.debug(`\n--- Before Enter ---\n${beforeContent}\n--- End Before Enter ---`);
+            logger.debug(`\n--- Before ${step.key} ---\n${beforeContent}\n--- End Before ${step.key} ---`);
           }
 
           // Keys are not sent literally.
           this.runTmux(['send-keys', '-t', this.session, keyToSend]);
 
-          if (step.key === 'Enter' && logLevel === 'debug') {
-            await new Promise(resolve => setTimeout(resolve, 250)); // Allow screen to settle
+          // Always allow the screen to settle after a key press.
+          // This ensures consistent behavior regardless of log level.
+          await new Promise(resolve => setTimeout(resolve, 250));
+
+          if (logLevel === 'debug') {
             const afterContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
-            logger.debug(`\n--- After Enter ---\n${afterContent}\n--- End After Enter ---`);
+            logger.debug(`\n--- After ${step.key} ---\n${afterContent}\n--- End After ${step.key} ---`);
           }
 
           await this.captureDebugScreen(`after_send_key_${step.key}`);
@@ -178,6 +181,8 @@ export class RobotEngine {
             const pressKey = KEY_MAP[step.key] || step.key;
             logger.info(`[Condition] Text "${step.text}" found. Sending key: ${step.key} -> tmux: ${pressKey}`);
             this.runTmux(['send-keys', '-t', this.session, pressKey]);
+            // Also settle after this conditional key press
+            await new Promise(resolve => setTimeout(resolve, 250));
           } else {
             console.log(`[Condition] Text "${step.text}" not found. Skipping.`);
           }
@@ -271,8 +276,6 @@ export class RobotEngine {
       return; // Only run in debug mode
     }
     try {
-      // Short delay to ensure screen has settled after the action
-      await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
       const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
@@ -291,4 +294,3 @@ export class RobotEngine {
     }
   }
 }
-

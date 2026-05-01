@@ -141,29 +141,28 @@ Create a YAML file that defines the sequence of actions the robot should perform
 
 ### Step 4: Run the Robot
 
-Execute the robot using the `run_robot.sh` script. You must provide the LPAR name as the first argument, which tells the script which `.env` file to load.
+Execute the robot using the `run-robot.sh` script. You must provide the path to your YAML script as the first argument and the LPAR name as the second argument (which tells the script which `.env` file to load).
 
 ```bash
 # Make the script executable
-chmod +x run_robot.sh
+chmod +x run-robot.sh
 
-# Run the robot against the 'pub400.com' LPAR
-# This will load .env.pub400.com and run the default example_script.yaml
-./run_robot.sh pub400.com
+# Run the robot with the default example script against the 'pub400.com' LPAR
+./run-robot.sh example_script.yaml pub400.com
 
 # Run a specific automation script against a different LPAR
-./run_robot.sh mylpar my_automation.yaml
+./run-robot.sh my_automation.yaml mylpar
 ```
 
 The script will automatically start a `tmux` session, connect the `tn5250` emulator, and then hand off control to the Node.js automation engine.
 
 ## 🏃 How to Run
 
-Simply use the provided robust bash script, passing the LPAR name as an argument. The second argument, the path to the YAML script, is optional.
+Simply use the provided robust bash script, passing the path to the YAML script and the LPAR name as arguments. Both are required.
 
 ```bash
-chmod +x run_robot.sh
-./run_robot.sh <LPAR_NAME> [path_to_yaml_script]
+chmod +x run-robot.sh
+./run-robot.sh <path_to_yaml_script> <LPAR_NAME>
 ```
 
 ## 📁 Project Structure
