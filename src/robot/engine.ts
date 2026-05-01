@@ -33,6 +33,7 @@ export class RobotEngine {
   private host: string;
   private maxRows: number;
   private maxCols: number;
+  private lastLoggedTitle: string = '';
 
   constructor(yamlPath: string) {
     const fileContents = fs.readFileSync(yamlPath, 'utf8');
@@ -80,6 +81,32 @@ export class RobotEngine {
     return result.status === 0;
   }
 
+  private capturePane(): string {
+    const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+    
+    const lines = paneContent.split('\n');
+    let newTitle = '';
+    
+    // Only scan the first 5 lines for a title. 
+    // This prevents picking up the tn5250 status line (e.g. "5250 ... 001/001") 
+    // at the bottom when the rest of the screen is blank.
+    const searchLines = lines.slice(0, 5);
+    for (const line of searchLines) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        newTitle = trimmed;
+        break;
+      }
+    }
+    
+    if (newTitle && newTitle !== this.lastLoggedTitle) {
+      logger.info(`[Screen] ${newTitle}`);
+      this.lastLoggedTitle = newTitle;
+    }
+    
+    return paneContent;
+  }
+
   async run() {
     console.log(`Starting Robot: ${this.script.name}`);
     console.log(`Description: ${this.script.description || 'N/A'}`);
@@ -89,6 +116,9 @@ export class RobotEngine {
       console.log(`Hint: Start your 5250 session in tmux: tmux new-session -s ${this.session} "tn5250 <host>"`);
       process.exit(1);
     }
+
+    // Capture initial screen state
+    this.capturePane();
 
     for (let i = 0; i < this.script.steps.length; i++) {
       const step = this.script.steps[i];
@@ -111,7 +141,7 @@ export class RobotEngine {
           logger.debug(`[Key Send] Sending key: '${step.key}' -> tmux: '${keyToSend}'`);
 
           if (logLevel === 'debug') {
-            const beforeContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+            const beforeContent = this.capturePane();
             logger.debug(`\n--- Before ${step.key} ---\n${beforeContent}\n--- End Before ${step.key} ---`);
           }
 
@@ -123,7 +153,7 @@ export class RobotEngine {
           await new Promise(resolve => setTimeout(resolve, 250));
 
           if (logLevel === 'debug') {
-            const afterContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+            const afterContent = this.capturePane();
             logger.debug(`\n--- After ${step.key} ---\n${afterContent}\n--- End After ${step.key} ---`);
           }
 
@@ -134,7 +164,7 @@ export class RobotEngine {
           await new Promise(resolve => setTimeout(resolve, step.seconds * 1000));
           break;
         case 'capture':
-          const capture = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+          const capture = this.capturePane();
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
           const hostDir = path.join(process.cwd(), 'captures', this.host);
           
@@ -159,7 +189,6 @@ export class RobotEngine {
             step.end_col, 
             step.is_message_line
           );
-          await this.logScreenTitle();
           await this.captureDebugScreen(`after_wait_for_${step.text.replace(/\s+/g, '_')}`);
           break;
         case 'press_key_if_text_present':
@@ -190,6 +219,9 @@ export class RobotEngine {
           }
           break;
       }
+
+      // Ensure we capture and log the screen title if it changed after the step
+      this.capturePane();
     }
 
     logger.info('Automation complete!');
@@ -243,7 +275,7 @@ export class RobotEngine {
     let lastContent = '';
 
     while (Date.now() < expiry) {
-      lastContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+      lastContent = this.capturePane();
       if (this.findTextInBuffer(lastContent, text, row, col, endRow, endCol, isMessageLine)) {
         return { found: true, lastContent };
       }
@@ -273,30 +305,13 @@ export class RobotEngine {
     throw new Error(errorMsg);
   }
 
-  private async logScreenTitle() {
-    try {
-      // Give the screen a brief moment to settle before capturing
-      await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-      const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
-      const lines = paneContent.split('\n');
-      if (lines.length > 0) {
-        const title = lines[0].trim();
-        if (title) {
-          logger.info(`[Screen] ${title}`);
-        }
-      }
-    } catch (error: any) {
-      logger.warn(`Could not capture screen title: ${error.message}`);
-    }
-  }
-
   // NEW: Automatic screen capture for debug mode
   private async captureDebugScreen(actionName: string) {
     if (logLevel !== 'debug') {
       return; // Only run in debug mode
     }
     try {
-      const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+      const paneContent = this.capturePane();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
       const captureDir = path.join(process.cwd(), 'logs', 'captures', this.host);
