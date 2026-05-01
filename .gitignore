@@ -13,3 +13,7 @@ captures/*
 
 # Log files#
 logs/*
+
+# Non test yaml scripts
+*.yaml
+!example*.yaml

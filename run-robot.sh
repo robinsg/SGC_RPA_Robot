@@ -73,54 +73,60 @@ if ! command -v tmux &> /dev/null; then
     exit 1
 fi
 
-# Track if this script instance created the session
-SESSION_CREATED_BY_SCRIPT=false
-# Check if session exists, if not, start it
-if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
-    SESSION_CREATED_BY_SCRIPT=true
-    log_message "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
-    
-    # Build the tn5250 command arguments dynamically
-    TN_CMD_ARGS=("map=$TN5250_MAP" "env.TERM=$TN5250_DEVICE_TYPE")
-
-    # Add DEVNAME only if the variable is set and not empty
-    if [ -n "$TN5250_DEVICE_NAME" ]; then
-        TN_CMD_ARGS+=("env.DEVNAME=$TN5250_DEVICE_NAME")
-    fi
-
-    if [ -n "$TN5250_SSL_FLAG" ]; then
-        TN_CMD_ARGS+=("$TN5250_SSL_FLAG")
-    fi
-    
-    # Determine the required tmux buffer dimensions based on the device type
-    # 27x132 models
-    if [[ "$TN5250_DEVICE_TYPE" == "IBM-3477-FC" || "$TN5250_DEVICE_TYPE" == "IBM-3477-FG" || "$TN5250_DEVICE_TYPE" == "IBM-3180-2" ]]; then
-        TMUX_SIZE="-x 132 -y 27"
-    # 24x80 models
-    elif [[ "$TN5250_DEVICE_TYPE" == "IBM-3179-2" || "$TN5250_DEVICE_TYPE" == "IBM-3196-A1" || "$TN5250_DEVICE_TYPE" == "IBM-5292-2" || "$TN5250_DEVICE_TYPE" == "IBM-5291-1" || "$TN5250_DEVICE_TYPE" == "IBM-5251-11" ]]; then
-        TMUX_SIZE="-x 80 -y 24"
-    else
-        log_message "Error: Unsupported TN5250_DEVICE_TYPE '$TN5250_DEVICE_TYPE'."
-        exit 1
-    fi
-
-    # The host must be the last argument for tn5250
-    TN_CMD_ARGS+=("$TN5250_HOST")
-    
-    FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
-    log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
-    tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
-    
-    # Robustness Check: Wait a moment and verify the session started.
+# Ensure a clean state by terminating any existing session with this name.
+# This prevents "hanging" sessions from causing state-related failures.
+if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    log_message "Existing session '$TMUX_SESSION' found. Terminating it to ensure a clean start."
+    tmux kill-session -t "$TMUX_SESSION"
+    # Brief pause to allow the system to reap the processes
     sleep 1
-    if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
-        log_message "Error: Failed to start tmux session '$TMUX_SESSION'."
-        log_message "This is often caused by an invalid hostname or tn5250 command error."
-        log_message "Please check the hostname in your .env file and the tn5250 installation."
-        exit 1
-    fi
-    log_message "Session started successfully."
 fi
+
+# Track if this script instance created the session (now effectively always true)
+SESSION_CREATED_BY_SCRIPT=true
+log_message "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
+
+# Build the tn5250 command arguments dynamically
+TN_CMD_ARGS=("map=$TN5250_MAP" "env.TERM=$TN5250_DEVICE_TYPE")
+
+# Add DEVNAME only if the variable is set and not empty
+if [ -n "$TN5250_DEVICE_NAME" ]; then
+    TN_CMD_ARGS+=("env.DEVNAME=$TN5250_DEVICE_NAME")
+fi
+
+if [ -n "$TN5250_SSL_FLAG" ]; then
+    TN_CMD_ARGS+=("$TN5250_SSL_FLAG")
+fi
+
+# Determine the required tmux buffer dimensions based on the device type
+# 27x132 models
+if [[ "$TN5250_DEVICE_TYPE" == "IBM-3477-FC" || "$TN5250_DEVICE_TYPE" == "IBM-3477-FG" || "$TN5250_DEVICE_TYPE" == "IBM-3180-2" ]]; then
+    TMUX_SIZE="-x 132 -y 27"
+# 24x80 models
+elif [[ "$TN5250_DEVICE_TYPE" == "IBM-3179-2" || "$TN5250_DEVICE_TYPE" == "IBM-3196-A1" || "$TN5250_DEVICE_TYPE" == "IBM-5292-2" || "$TN5250_DEVICE_TYPE" == "IBM-5291-1" || "$TN5250_DEVICE_TYPE" == "IBM-5251-11" ]]; then
+    TMUX_SIZE="-x 80 -y 24"
+else
+    log_message "Error: Unsupported TN5250_DEVICE_TYPE '$TN5250_DEVICE_TYPE'."
+    exit 1
+fi
+
+# The host must be the last argument for tn5250
+TN_CMD_ARGS+=("$TN5250_HOST")
+
+FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
+log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
+tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
+
+# Robustness Check: Wait a moment and verify the session started.
+sleep 1
+if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    log_message "Error: Failed to start tmux session '$TMUX_SESSION'."
+    log_message "This is often caused by an invalid hostname or tn5250 command error."
+    log_message "Please check the hostname in your .env file and the tn5250 installation."
+    exit 1
+fi
+log_message "Session started successfully."
+
 
 # Export the session name so the robot knows which session to target
 export TMUX_SESSION
