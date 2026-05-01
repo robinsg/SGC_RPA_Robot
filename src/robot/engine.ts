@@ -95,6 +95,11 @@ export class RobotEngine {
       const desc = step.description ? ` (${step.description})` : '';
       console.log(`[Step ${i + 1}/${this.script.steps.length}] ${step.type}${desc}`);
 
+      // Robustness: Check if session still exists before each step
+      if (!this.checkSessionExists()) {
+        throw new Error(`Tmux session '${this.session}' disappeared before step ${i + 1}`);
+      }
+
       switch (step.type) {
         case 'send_text':
           // Use the -l flag to send the text literally, preventing shell interpolation.
@@ -155,6 +160,11 @@ export class RobotEngine {
           await this.captureDebugScreen(`after_wait_for_${step.text.replace(/\s+/g, '_')}`);
           break;
         case 'press_key_if_text_present':
+          // Allow the screen to settle before checking. 5250 is asynchronous.
+          const settleTime = step.wait_ms !== undefined ? step.wait_ms : 250;
+          if (settleTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, settleTime));
+          }
           const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
           if (this.findTextInBuffer(
             paneContent,
@@ -223,17 +233,19 @@ export class RobotEngine {
   ) {
     const startTime = Date.now();
     const expiry = startTime + (timeout * 1000);
+    let lastContent = '';
 
     while (Date.now() < expiry) {
-      const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
-      if (this.findTextInBuffer(paneContent, text, row, col, endRow, endCol, isMessageLine)) {
+      lastContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+      if (this.findTextInBuffer(lastContent, text, row, col, endRow, endCol, isMessageLine)) {
         return;
       }
 
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    throw new Error(`Timeout waiting for text: "${text}"`);
+    const errorMsg = `Timeout waiting for text: "${text}" after ${timeout}s.\n--- Current Screen Content ---\n${lastContent}\n--- End Content ---`;
+    throw new Error(errorMsg);
   }
 
   private async logScreenTitle() {

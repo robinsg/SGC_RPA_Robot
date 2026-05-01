@@ -41,6 +41,7 @@ export const ActionSchema = z.discriminatedUnion('type', [
     end_row: z.number().optional(),
     end_col: z.number().optional(),
     is_message_line: z.boolean().optional(),
+    wait_ms: z.number().optional(),
     description: z.string().optional(),
   })
 ]);
