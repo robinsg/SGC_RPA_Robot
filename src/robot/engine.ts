@@ -3,10 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { RobotScript, RobotScriptSchema } from './schema';
-import logger from './logger'; // <-- IMPORT THE NEW LOGGER
+import logger from './logger';
 
-// A mapping from logical, human-readable key names to the specific
-// key codes that tmux expects for a 5250 session.
 const KEY_MAP: { [key: string]: string } = {
   'Enter': 'C-m',
   'Field_exit': 'C-f',
@@ -26,10 +24,15 @@ const KEY_MAP: { [key: string]: string } = {
 
 const logLevel = process.env.LOG_LEVEL || 'info';
 
+const SUPPORTED_27x132 = ['IBM-3477-FC', 'IBM-3477-FG', 'IBM-3180-2'];
+const SUPPORTED_24x80 = ['IBM-3179-2', 'IBM-3196-A1', 'IBM-5292-2', 'IBM-5291-1', 'IBM-5251-11'];
+
 export class RobotEngine {
   private script: RobotScript;
   private session: string;
   private host: string;
+  private maxRows: number;
+  private maxCols: number;
 
   constructor(yamlPath: string) {
     const fileContents = fs.readFileSync(yamlPath, 'utf8');
@@ -46,6 +49,17 @@ export class RobotEngine {
     // Use the session name from the environment variable, falling back to the script's definition
     this.session = process.env.TMUX_SESSION || this.script.tmux_session;
     this.host = process.env.TN5250_HOST || 'unknown_host';
+
+    const deviceType = process.env.TN5250_DEVICE_TYPE || 'IBM-3477-FC';
+    if (SUPPORTED_27x132.includes(deviceType)) {
+      this.maxRows = 27;
+      this.maxCols = 132;
+    } else if (SUPPORTED_24x80.includes(deviceType)) {
+      this.maxRows = 24;
+      this.maxCols = 80;
+    } else {
+      throw new Error(`Unsupported TN5250_DEVICE_TYPE: ${deviceType}`);
+    }
   }
 
   private runTmux(args: string[]): string {
@@ -176,7 +190,8 @@ export class RobotEngine {
     const lines = paneContent.split('\n');
 
     if (isMessageLine) {
-      const messageLineIndex = lines.length >= 27 ? 26 : 23;
+      // Use configured maxRows to determine message line instead of guessing
+      const messageLineIndex = this.maxRows === 27 ? 26 : 23;
       const line = lines[messageLineIndex] || '';
       return line.includes(text);
     } else if (row !== undefined && col !== undefined && endRow !== undefined && endCol !== undefined) {

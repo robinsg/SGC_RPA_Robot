@@ -92,12 +92,24 @@ if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
         TN_CMD_ARGS+=("$TN5250_SSL_FLAG")
     fi
     
+    # Determine the required tmux buffer dimensions based on the device type
+    # 27x132 models
+    if [[ "$TN5250_DEVICE_TYPE" == "IBM-3477-FC" || "$TN5250_DEVICE_TYPE" == "IBM-3477-FG" || "$TN5250_DEVICE_TYPE" == "IBM-3180-2" ]]; then
+        TMUX_SIZE="-x 132 -y 27"
+    # 24x80 models
+    elif [[ "$TN5250_DEVICE_TYPE" == "IBM-3179-2" || "$TN5250_DEVICE_TYPE" == "IBM-3196-A1" || "$TN5250_DEVICE_TYPE" == "IBM-5292-2" || "$TN5250_DEVICE_TYPE" == "IBM-5291-1" || "$TN5250_DEVICE_TYPE" == "IBM-5251-11" ]]; then
+        TMUX_SIZE="-x 80 -y 24"
+    else
+        log_message "Error: Unsupported TN5250_DEVICE_TYPE '$TN5250_DEVICE_TYPE'."
+        exit 1
+    fi
+
     # The host must be the last argument for tn5250
     TN_CMD_ARGS+=("$TN5250_HOST")
     
     FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
-    log_message "Executing: $FULL_CMD"
-    tmux new-session -d -s "$TMUX_SESSION" "$FULL_CMD"
+    log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
+    tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
     
     # Robustness Check: Wait a moment and verify the session started.
     sleep 1
