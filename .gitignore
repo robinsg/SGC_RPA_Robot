@@ -10,3 +10,6 @@ coverage/
 # RPA Captures
 captures/*
 !captures/example/
+
+# Log files#
+logs/*

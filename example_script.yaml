@@ -28,20 +28,10 @@ steps:
     key: "Enter"
     description: "Submit sign-on"
 
-  - type: "capture"
-    filename: "debug_signon"
-    description: "Capture the screen just after sign in sumitted"
-
-
   - type: "press_key_if_text_present"
-    text: "Sign On Information"
+    text: "Sign-on Information"
     key: "Enter"
     description: "Acknowledge optional Sign On Information display"
-
-  - type: "capture"
-    filename: "debug_signon_onfo"
-    description: "Capture the screen just after sign in Information"
-
 
   - type: "wait_for_text"
     text: "IBM i Main Menu"
@@ -49,6 +39,10 @@ steps:
     row: 1
     col: 33
     timeout_seconds: 10 # It's good practice to have a timeout to prevent infinite hangs
+
+  - type: "capture"
+    filename: "Main_menu"
+    description: "Capture the screen after sign in Information"
 
   - type: "wait_for_text"
     text: "Selection or command"
@@ -71,4 +65,3 @@ steps:
   - type: "capture"
     filename: "last_screen.txt"
     description: "Save final state"
-
