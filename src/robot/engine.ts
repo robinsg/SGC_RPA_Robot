@@ -7,7 +7,7 @@ import logger from './logger';
 
 const KEY_MAP: { [key: string]: string } = {
   'Enter': 'C-m',
-  'Field_exit': 'C-f',
+  'Field_exit': 'C-x',
   'Reset': 'C-r',
   'Tab': 'Tab',
   'F1': 'F1', 'F2': 'F2', 'F3': 'F3', 'F4': 'F4',
