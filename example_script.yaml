@@ -66,8 +66,13 @@ steps:
   - *submit_enter
 
   - type: "send_key"
-    key: "F9"
-    description: "Move to command line"
+    key: "F3"
+    description: "Exit WRKACTJOB"
+
+  - type: "wait_for_text"
+    text: "IBM i Main Menu"
+    description: "Ensure we returned to the main menu"
+    timeout_seconds: 10
 
   - type: "send_text"
     text: "signoff"
@@ -78,6 +83,11 @@ steps:
     description: "Field Exit"
 
   - *submit_enter
+
+  - type: "wait_for_text"
+    text: "Sign On"
+    description: "Wait for Sign On display"
+    timeout_seconds: 10
 
   - type: "capture"
     filename: "last_screen.txt"
