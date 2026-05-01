@@ -168,23 +168,25 @@ export class RobotEngine {
           if (settleTime > 0) {
             await new Promise(resolve => setTimeout(resolve, settleTime));
           }
-          const paneContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
-          if (this.findTextInBuffer(
-            paneContent,
+          
+          const result = await this.waitForTextInternal(
             step.text,
+            step.timeout_seconds,
             step.row,
             step.col,
             step.end_row,
             step.end_col,
             step.is_message_line
-          )) {
+          );
+
+          if (result.found) {
             const pressKey = KEY_MAP[step.key] || step.key;
             logger.info(`[Condition] Text "${step.text}" found. Sending key: ${step.key} -> tmux: ${pressKey}`);
             this.runTmux(['send-keys', '-t', this.session, pressKey]);
             // Also settle after this conditional key press
             await new Promise(resolve => setTimeout(resolve, 250));
           } else {
-            console.log(`[Condition] Text "${step.text}" not found. Skipping.`);
+            logger.info(`[Condition] Text "${step.text}" not found after ${step.timeout_seconds}s. Skipping.`);
           }
           break;
       }
@@ -227,6 +229,31 @@ export class RobotEngine {
     }
   }
 
+  private async waitForTextInternal(
+    text: string, 
+    timeout: number, 
+    row?: number, 
+    col?: number, 
+    endRow?: number, 
+    endCol?: number, 
+    isMessageLine?: boolean
+  ): Promise<{ found: boolean; lastContent: string }> {
+    const startTime = Date.now();
+    const expiry = startTime + (timeout * 1000);
+    let lastContent = '';
+
+    while (Date.now() < expiry) {
+      lastContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
+      if (this.findTextInBuffer(lastContent, text, row, col, endRow, endCol, isMessageLine)) {
+        return { found: true, lastContent };
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    return { found: false, lastContent };
+  }
+
   private async waitForText(
     text: string, 
     timeout: number, 
@@ -236,20 +263,13 @@ export class RobotEngine {
     endCol?: number, 
     isMessageLine?: boolean
   ) {
-    const startTime = Date.now();
-    const expiry = startTime + (timeout * 1000);
-    let lastContent = '';
+    const result = await this.waitForTextInternal(text, timeout, row, col, endRow, endCol, isMessageLine);
 
-    while (Date.now() < expiry) {
-      lastContent = this.runTmux(['capture-pane', '-t', this.session, '-p']);
-      if (this.findTextInBuffer(lastContent, text, row, col, endRow, endCol, isMessageLine)) {
-        return;
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 500));
+    if (result.found) {
+      return;
     }
 
-    const errorMsg = `Timeout waiting for text: "${text}" after ${timeout}s.\n--- Current Screen Content ---\n${lastContent}\n--- End Content ---`;
+    const errorMsg = `Timeout waiting for text: "${text}" after ${timeout}s.\n--- Current Screen Content ---\n${result.lastContent}\n--- End Content ---`;
     throw new Error(errorMsg);
   }
 
