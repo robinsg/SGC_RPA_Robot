@@ -1,3 +1,9 @@
+definitions:
+  submit_enter: &submit_enter
+    type: "send_key"
+    key: "Enter"
+    description: "Send Enter"
+
 name: "Sample Login Script"
 description: "Logs into a TN5250 session and checks the main menu"
 tmux_session: "5250_robot"
@@ -24,13 +30,12 @@ steps:
     seconds: 0.5
     description: "Pause briefly before submitting"   
   
-  - type: "send_key"
-    key: "Enter"
-    description: "Submit sign-on"
+  - *submit_enter
 
   - type: "press_key_if_text_present"
     text: "Sign-on Information"
     key: "Enter"
+    timeout_seconds: 10
     description: "Acknowledge optional Sign On Information display"
 
   - type: "wait_for_text"
@@ -40,17 +45,13 @@ steps:
     col: 33
     timeout_seconds: 10 # It's good practice to have a timeout to prevent infinite hangs
 
-  - type: "capture"
-    filename: "Main_menu"
-    description: "Capture the screen after sign in Information"
-
-  - type: "wait_for_text"
-    text: "Selection or command"
-    description: "Check for prompt in a specific block"
-    row: 19
-    col: 2
-    end_row: 21
-    end_col: 40
+#  - type: "wait_for_text"
+#    text: "Selection or command"
+#    description: "Check for prompt in a specific block"
+#    row: 19
+#    col: 2
+#    end_row: 21
+#    end_col: 40
 
 #  - type: "wait_for_text"
 #    text: "CPF"
@@ -58,9 +59,25 @@ steps:
 #    description: "Listen for dynamic error messages on the status line"
 #    timeout_seconds: 5
 
+  - type: "send_text"
+    text: "wrkactjob"
+    description: "wrkactjob command"
+
+  - *submit_enter
+
   - type: "send_key"
-    key: "F3"
-    description: "Exit session"
+    key: "F9"
+    description: "Move to command line"
+
+  - type: "send_text"
+    text: "signoff"
+    description: "signoff command"
+
+  - type: "send_key"
+    key: "Field_exit"
+    description: "Field Exit"
+
+  - *submit_enter
 
   - type: "capture"
     filename: "last_screen.txt"
