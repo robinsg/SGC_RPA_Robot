@@ -5,7 +5,7 @@ import * as yaml from 'js-yaml';
 import { RobotScript, RobotScriptSchema } from './schema';
 import logger from './logger';
 
-const KEY_MAP: { [key: string]: string } = {
+export const KEY_MAP: { [key: string]: string } = {
   'Enter': 'C-m',
   'Field_exit': 'C-x',
   'Reset': 'C-r',
