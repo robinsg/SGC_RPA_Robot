@@ -8,14 +8,24 @@ mkdir -p "$LOG_DIR"
 mkdir -p "$DEBUG_CAPTURE_DIR"
 export LOG_DIR
 
-# --- LPAR Name Processing ---
-# This must be done early so the logger knows the filename.
-if [ -z "$1" ]; then
-  echo "Error: LPAR name is required as the first argument."
-  echo "Usage: $0 <LPAR_NAME> [path_to_yaml_script]"
+# --- Argument Processing ---
+# YAML file is the first argument, LPAR name is the second.
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Error: Both YAML file and LPAR name are required."
+  echo "Usage: $0 <path_to_yaml_script> <LPAR_NAME>"
   exit 1
 fi
-LPAR_NAME_LOWER=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+
+YAML_FILE="$1"
+LPAR_NAME="$2"
+
+# Verify YAML file exists
+if [ ! -f "$YAML_FILE" ]; then
+  echo "Error: YAML file '$YAML_FILE' not found."
+  exit 1
+fi
+
+LPAR_NAME_LOWER=$(echo "$LPAR_NAME" | tr '[:upper:]' '[:lower:]')
 
 # --- Unified Logging Function ---
 # Logs a message to both stdout and the appropriate log file.
@@ -42,7 +52,7 @@ if [ -f "$ENV_FILE" ]; then
   source "$ENV_FILE"
   set +o allexport
 else
-  log_message "Error: Configuration file '$ENV_FILE' not found for LPAR '$1'."
+  log_message "Error: Configuration file '$ENV_FILE' not found for LPAR '$LPAR_NAME'."
   exit 1
 fi
 
@@ -50,9 +60,6 @@ fi
 # The command-line LPAR name is the source of truth for the host.
 # This prevents the .env file from overriding the LPAR context.
 export TN5250_HOST=$LPAR_NAME_LOWER
-
-# The second argument is the YAML file, defaulting to example_script.yaml
-YAML_FILE=${2:-"example_script.yaml"}
 
 # Unconditionally set the session name based on the host. This prevents
 # a value from the .env file from causing a mismatch.
