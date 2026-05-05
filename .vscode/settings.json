@@ -1,0 +1,35 @@
+{
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/continuedev/continue/main/schema/config.yaml.json": [
+      "~/.continue/config.json"
+    ],
+    // Recommended: Add a schema for your robot's YAML files for autocompletion and validation.
+    // You would need to generate this JSON schema from your Zod schema in src/robot/schema.ts
+    "./schemas/robot.schema.json": ["*.yaml", "!example_script.yaml"]
+  },
+  "yaml.schemaStore.enable": false,
+
+  // --- Recommended General & TypeScript Settings ---
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // --- File & Search Exclusions ---
+  // Hides clutter from the file explorer
+  "files.exclude": {
+    "**/.git": true,
+    "node_modules/": true,
+    "dist/": true,
+    "build/": true,
+    "coverage/": true
+  },
+  // Excludes clutter from search results
+  "search.exclude": {
+    "**/node_modules": true,
+    "dist/": true,
+    "build/": true,
+    "coverage/": true
+  }
+}
