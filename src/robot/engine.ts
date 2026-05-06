@@ -8,7 +8,6 @@ import logger from './logger';
 export const KEY_MAP: { [key: string]: string } = {
   'Enter': 'C-m',
   'Field_exit': 'C-x',
-  'Reset': 'C-r',
   'Tab': 'Tab',
   'F1': 'F1', 'F2': 'F2', 'F3': 'F3', 'F4': 'F4',
   'F5': 'F5', 'F6': 'F6', 'F7': 'F7', 'F8': 'F8',
@@ -19,7 +18,6 @@ export const KEY_MAP: { [key: string]: string } = {
   'Page_up': 'PPage',   // Roll Up in 5250
   'Page_down': 'NPage', // Roll Down in 5250
   'Print': 'C-p',
-  'Help': 'S-F1', // Often F13 is Help, mapping to S-F1
 };
 
 const logLevel = process.env.LOG_LEVEL || 'info';
