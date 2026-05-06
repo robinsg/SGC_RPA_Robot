@@ -1,6 +1,7 @@
+import { describe, it, expect } from 'vitest';
 import { KEY_MAP } from '../engine';
 
-function testKeyMappings() {
+describe('5250 Key Mappings', () => {
   const expectedKeys = [
     'Enter', 'Field_exit', 'Tab',
     'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
@@ -8,42 +9,22 @@ function testKeyMappings() {
     'Page_up', 'Page_down', 'Print'
   ];
 
-  console.log('Testing 5250 Key Mappings...');
-  let passed = 0;
-  let failed = 0;
-
-  for (const key of expectedKeys) {
-    if (KEY_MAP[key]) {
-      console.log(`✅ [PASS] ${key} -> ${KEY_MAP[key]}`);
-      passed++;
-    } else {
-      console.error(`❌ [FAIL] Missing mapping for key: ${key}`);
-      failed++;
+  it('should have all expected 5250 keys mapped', () => {
+    for (const key of expectedKeys) {
+      expect(KEY_MAP[key], `Missing mapping for key: ${key}`).toBeDefined();
     }
-  }
+  });
 
-  // Specific value checks
-  const specificChecks = [
-    { key: 'Enter', expected: 'C-m' },
-    { key: 'F13', expected: 'S-F1' },
-    { key: 'Page_up', expected: 'PPage' },
-    { key: 'Page_down', expected: 'NPage' }
-  ];
+  it('should have correct mappings for core keys', () => {
+    const specificChecks = [
+      { key: 'Enter', expected: 'C-m' },
+      { key: 'F13', expected: 'S-F1' },
+      { key: 'Page_up', expected: 'PPage' },
+      { key: 'Page_down', expected: 'NPage' }
+    ];
 
-  for (const check of specificChecks) {
-    if (KEY_MAP[check.key] === check.expected) {
-      console.log(`✅ [PASS] ${check.key} correctly mapped to ${check.expected}`);
-      passed++;
-    } else {
-      console.error(`❌ [FAIL] ${check.key} mapped to ${KEY_MAP[check.key]}, expected ${check.expected}`);
-      failed++;
+    for (const check of specificChecks) {
+      expect(KEY_MAP[check.key]).toBe(check.expected);
     }
-  }
-
-  console.log(`\nResults: ${passed} passed, ${failed} failed`);
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-testKeyMappings();
+  });
+});
