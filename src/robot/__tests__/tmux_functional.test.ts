@@ -8,18 +8,19 @@ const __dirname = path.dirname(__filename);
 
 function testTmuxFunctional() {
   const keysToTest = [
-    'Enter',
-    'F1',
-    'F13',
-    'Page_up',
-    'Page_down'
+    { key: 'Enter', expectedPattern: /DONE/ }, // Enter (C-m) might be invisible or consumed, but sentinel DONE follows
+    { key: 'F1', expectedPattern: /\^\[OP/ },
+    { key: 'F13', expectedPattern: /\^\[\[1;2P/ },
+    { key: 'Page_up', expectedPattern: /\^\[\[5~/ },
+    { key: 'Page_down', expectedPattern: /\^\[\[6~/ }
   ];
 
   console.log('Running Tmux Functional Tests...');
   let passed = 0;
   let failed = 0;
 
-  for (const key of keysToTest) {
+  for (const item of keysToTest) {
+    const { key, expectedPattern } = item;
     const tmuxKey = KEY_MAP[key];
     console.log(`Testing key: ${key} (tmux: ${tmuxKey})`);
 
@@ -27,13 +28,11 @@ function testTmuxFunctional() {
       const helperPath = path.join(__dirname, 'helpers', 'tmux_tester.py');
       const output = execSync(`python3 "${helperPath}" ${tmuxKey}`, { encoding: 'utf-8' }).trim();
 
-      // C-m (Enter) might result in an empty string if cat -v consumes it and nothing else is there,
-      // but our tool sends Enter after the key.
-      if (output.length > 0 || key === 'Enter') {
-        console.log(`✅ [PASS] ${key} produced output: ${output || '(newline)'}`);
+      if (expectedPattern.test(output)) {
+        console.log(`✅ [PASS] ${key} produced expected output matching ${expectedPattern}`);
         passed++;
       } else {
-        console.error(`❌ [FAIL] ${key} produced no output`);
+        console.error(`❌ [FAIL] ${key} produced unexpected output: ${output}`);
         failed++;
       }
     } catch (error: any) {
