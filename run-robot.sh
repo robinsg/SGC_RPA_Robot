@@ -140,8 +140,9 @@ export TMUX_SESSION
 
 # Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
 set +e
-log_message "--- Starting RPA Automation ---"
-npx tsx src/robot/cli.ts "$YAML_FILE"
+log_message "--- Starting RPA Automation (Python) ---"
+export PYTHONPATH=$PYTHONPATH:.
+python3 -m robot_py.cli "$YAML_FILE"
 EXIT_CODE=$?
 set -e # Re-enable exit on error
 

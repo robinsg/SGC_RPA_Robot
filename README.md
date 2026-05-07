@@ -19,7 +19,8 @@ The machine running this application must have the following installed:
 
 1. **tmux**: Used for persistent terminal session management.
 2. **tn5250**: The standard C-based telnet 5250 emulator.
-3. **Node.js (v18+)**: To run the RPA engine and dashboard.
+3. **Python (3.12+)**: To run the RPA engine.
+4. **PyYAML**: Python library for parsing YAML files.
 
 ## ⚙️ Step-by-Step Implementation Guide
 
@@ -34,7 +35,7 @@ The machine running the robot must have the required software installed. This in
 1.  **Install Build Dependencies and Core Tools**:
     ```bash
     sudo apt update
-    sudo apt install -y git build-essential automake autoconf libncurses-dev pkg-config tmux nodejs npm
+    sudo apt install -y git build-essential automake autoconf libncurses-dev pkg-config tmux python3 python3-yaml
     ```
 
 2.  **Build and Install `tn5250` from Source**:
@@ -54,12 +55,6 @@ The machine running the robot must have the required software installed. This in
     cd ..
     rm -rf tn5250
     ```
-
-#### Install Project Dependencies
-Finally, install the Node.js packages required by the robot engine:
-```bash
-npm install
-```
 
 ### Step 2: Configure the Environment
 
@@ -147,20 +142,10 @@ LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
 ```
 Debug captures are stored in `logs/captures/<host>/`.
 
-## 🖥 Web Dashboard
-
-The project includes a React-based dashboard for previewing scripts and visualising the automation state.
-
-```bash
-# Start the dashboard in development mode
-npm run dev
-```
-Open `http://localhost:3000` to view the interface.
-
 ## 📁 Project Structure
 
-- `/src/robot/`: The core RPA engine logic (TypeScript).
-- `/src/`: React frontend application.
+- `robot_py/`: The core RPA engine logic (Python).
+- `ts_backup/`: Original TypeScript and React code (Archived).
 - `run-robot.sh`: The main entry point shell script.
 - `example_script.yaml`: A sample automation workflow.
 - `captures/`: Directory containing host-specific screen captures.
