@@ -20,7 +20,7 @@ The machine running this application must have the following installed:
 1. **tmux**: Used for persistent terminal session management.
 2. **tn5250**: The standard C-based telnet 5250 emulator.
 3. **Python (3.12+)**: To run the RPA engine.
-4. **PyYAML**: Python library for parsing YAML files.
+4. **Python Dependencies**: Listed in `requirements.txt`.
 
 ## ⚙️ Step-by-Step Implementation Guide
 
@@ -28,17 +28,22 @@ Follow these steps to configure and run your first 5250 robot automation.
 
 ### Step 1: Install Prerequisites
 
-The machine running the robot must have the required software installed. This involves installing standard packages from your distribution's package manager and compiling the `tn5250` emulator from source.
+The machine running the robot must have the required software installed. This involves installing standard packages from your distribution's package manager, compiling the `tn5250` emulator from source, and installing Python dependencies.
 
 #### For Debian/Ubuntu-based systems:
 
 1.  **Install Build Dependencies and Core Tools**:
     ```bash
     sudo apt update
-    sudo apt install -y git build-essential automake autoconf libncurses-dev pkg-config tmux python3 python3-yaml
+    sudo apt install -y git build-essential automake autoconf libncurses-dev pkg-config tmux python3 python3-pip
     ```
 
-2.  **Build and Install `tn5250` from Source**:
+2.  **Install Python Dependencies**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Build and Install `tn5250` from Source**:
     ```bash
     # Clone the official repository
     git clone https://github.com/tn5250j/tn5250.git
