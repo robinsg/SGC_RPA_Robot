@@ -1,9 +1,31 @@
-node_modules/
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.venv/
+
+# Test & Coverage artifacts
+.pytest_cache/
+coverage/
+htmlcov/
+
+# Build and distribution
 build/
 dist/
-coverage/
+
+node_modules/
+# OS-specific
 .DS_Store
+
+# Log files
 *.log
+logs/*
+
+# Environment variables
 .env*
 !.env.example
 
@@ -11,9 +33,9 @@ coverage/
 captures/*
 !captures/example/
 
-# Log files#
-logs/*
-
 # Non test yaml scripts
 *.yaml
 !example*.yaml
+
+# Backups
+ts_backup/
