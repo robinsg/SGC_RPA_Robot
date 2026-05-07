@@ -152,11 +152,16 @@ set -e # Re-enable exit on error
 log_message "--- Robot Finished ---"
 
 # --- Cleanup ---
-# If the script failed AND this script was the one that created the session, kill it.
-if [ "$EXIT_CODE" -ne 0 ] && [ "$SESSION_CREATED_BY_SCRIPT" = true ]; then
-    log_message "Robot failed with exit code $EXIT_CODE. Terminating tmux session '$TMUX_SESSION'..."
-    tmux kill-session -t "$TMUX_SESSION"
-    log_message "Session terminated."
+# Terminate the tmux session if it was created by this script.
+# This ensures no dangling sessions remain, whether the robot succeeded or failed.
+if [ "$SESSION_CREATED_BY_SCRIPT" = true ]; then
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        log_message "Terminating tmux session '$TMUX_SESSION'..."
+        tmux kill-session -t "$TMUX_SESSION"
+        log_message "Session terminated."
+    else
+        log_message "Session '$TMUX_SESSION' already terminated."
+    fi
 fi
 
 exit $EXIT_CODE
