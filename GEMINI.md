@@ -15,13 +15,13 @@ This project is an RPA (Robotic Process Automation) engine for IBM i (AS/400) sy
 - **Conditional Logic:** Use `press_key_if_text_present` for optional screens (e.g., Sign On Info, Password Expiry warnings) rather than hard branching.
 - **Mental Model:** Treat different screens as objects (Page Object Model). The YAML steps should represent a clear transition from one screen to the next.
 
-## TypeScript Engine Development
+## Python Engine Development
 - **Terminal Emulation (`env.TERM`):**
     - Validate that `env.TERM` uses one of the following supported types:
         - **27x132:** `IBM-3477-FC`, `IBM-3477-FG`, `IBM-3180-2`.
         - **24x80:** `IBM-3179-2`, `IBM-3196-A1`, `IBM-5292-2`, `IBM-5291-1`, `IBM-5251-11`.
     - Ensure the `tmux` buffer is correctly sized to match the terminal type (either 24x80 or 27x132) before starting the `tn5250` session.
-- **Schema Enforcement:** Any new automation action MUST start with an update to `src/robot/schema.ts` using Zod. The TypeScript engine must remain generic and driven by the YAML schema.
+- **Schema Enforcement:** The Python engine uses `dataclasses` and manual validation in `robot_py/schema.py`. The engine must remain generic and driven by the YAML schema.
 - **Tmux Interactions:** Only use `send-keys` and `capture-pane`. Avoid complex tmux scripting that makes debugging difficult.
 - **Tmux Session Safety:** Always check if the tmux session defined in the YAML exists before attempting to send keys or capture content.
 - **Error Handling:** When a terminal error occurs (e.g., timeout, missing session), include the current tmux pane content in the error message or log.
