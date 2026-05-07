@@ -46,6 +46,10 @@ class RobotEngine:
             raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
 
     def run_tmux(self, args: List[str]) -> str:
+        # Always check if the tmux session exists before attempting any command.
+        if not self.check_session_exists():
+             raise RuntimeError(f"Tmux session '{self.session}' not found.")
+
         cmd = ['tmux'] + args
         result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -56,8 +60,16 @@ class RobotEngine:
         return result.stdout
 
     def check_session_exists(self) -> bool:
-        result = subprocess.run(['tmux', 'has-session', '-t', self.session])
+        result = subprocess.run(['tmux', 'has-session', '-t', self.session], capture_output=True)
         return result.returncode == 0
+
+    def terminate_session(self):
+        """Kills the tmux session associated with this robot."""
+        if self.check_session_exists():
+            logger.info(f"Terminating tmux session: {self.session}")
+            subprocess.run(['tmux', 'kill-session', '-t', self.session], capture_output=True)
+        else:
+            logger.debug(f"Session {self.session} already gone, no need to terminate.")
 
     def capture_pane(self) -> str:
         pane_content = self.run_tmux(['capture-pane', '-t', self.session, '-p'])
@@ -144,88 +156,89 @@ class RobotEngine:
         if self.script.description:
             logger.info(f"Description: {self.script.description}")
 
-        if not self.check_session_exists():
-            logger.error(f"Error: Tmux session '{self.session}' not found.")
-            logger.info(f"Hint: Start your 5250 session in tmux: tmux new-session -s {self.session} \"tn5250 <host>\"")
-            return
-
-        self.capture_pane()
-
-        for i, step in enumerate(self.script.steps):
-            desc = f" ({step.description})" if step.description else ""
-            logger.info(f"[Step {i + 1}/{len(self.script.steps)}] {step.type}{desc}")
-
+        try:
             if not self.check_session_exists():
-                raise RuntimeError(f"Tmux session '{self.session}' disappeared before step {i + 1}")
+                logger.error(f"Error: Tmux session '{self.session}' not found.")
+                logger.info(f"Hint: Start your 5250 session in tmux: tmux new-session -s {self.session} \"tn5250 <host>\"")
+                return
 
-            if isinstance(step, SendTextAction):
-                self.run_tmux(['send-keys', '-l', '-t', self.session, step.text])
-            elif isinstance(step, SendKeyAction):
-                key_to_send = KEY_MAP.get(step.key, step.key)
-                logger.debug(f"[Key Send] Sending key: '{step.key}' -> tmux: '{key_to_send}'")
-                
-                if self.log_level == 'DEBUG':
-                    before = self.capture_pane()
-                    logger.debug(f"\n--- Before {step.key} ---\n{before}\n--- End Before {step.key} ---")
-                
-                self.run_tmux(['send-keys', '-t', self.session, key_to_send])
-                time.sleep(0.25)
-                
-                if self.log_level == 'DEBUG':
-                    after = self.capture_pane()
-                    logger.debug(f"\n--- After {step.key} ---\n{after}\n--- End After {step.key} ---")
-                
-                self.capture_debug_screen(f"after_send_key_{step.key}")
-            elif isinstance(step, SleepAction):
-                time.sleep(step.seconds)
-            elif isinstance(step, CaptureAction):
-                capture = self.capture_pane()
-                timestamp = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-                host_dir = os.path.join(os.getcwd(), 'captures', self.host)
-                os.makedirs(host_dir, exist_ok=True)
-                
-                base_name = step.filename or 'capture'
-                final_filename = f"{base_name}_{timestamp}.txt"
-                save_path = os.path.join(host_dir, final_filename)
-                
-                with open(save_path, 'w') as f:
-                    f.write(capture)
-                logger.info(f"[Capture] Saved to {save_path}")
-            elif isinstance(step, WaitForTextAction):
-                self.wait_for_text(
-                    step.text, 
-                    step.timeout_seconds, 
-                    step.row, 
-                    step.col, 
-                    step.end_row, 
-                    step.end_col, 
-                    step.is_message_line
-                )
-                safe_text = "".join([c if c.isalnum() else "_" for c in step.text])
-                self.capture_debug_screen(f"after_wait_for_{safe_text}")
-            elif isinstance(step, PressKeyIfTextPresentAction):
-                settle_time = step.wait_ms / 1000.0 if step.wait_ms is not None else 0.25
-                if settle_time > 0:
-                    time.sleep(settle_time)
-                
-                found, last_content = self.wait_for_text_internal(
-                    step.text,
-                    step.timeout_seconds,
-                    step.row,
-                    step.col,
-                    step.end_row,
-                    step.end_col,
-                    step.is_message_line
-                )
-
-                if found:
-                    press_key = KEY_MAP.get(step.key, step.key)
-                    logger.info(f"[Condition] Text \"{step.text}\" found. Sending key: {step.key} -> tmux: {press_key}")
-                    self.run_tmux(['send-keys', '-t', self.session, press_key])
-                    time.sleep(0.25)
-                else:
-                    logger.info(f"[Condition] Text \"{step.text}\" not found after {step.timeout_seconds}s. Skipping.")
-            
             self.capture_pane()
+
+            for i, step in enumerate(self.script.steps):
+                desc = f" ({step.description})" if step.description else ""
+                logger.info(f"[Step {i + 1}/{len(self.script.steps)}] {step.type}{desc}")
+
+                if isinstance(step, SendTextAction):
+                    self.run_tmux(['send-keys', '-l', '-t', self.session, step.text])
+                elif isinstance(step, SendKeyAction):
+                    key_to_send = KEY_MAP.get(step.key, step.key)
+                    logger.debug(f"[Key Send] Sending key: '{step.key}' -> tmux: '{key_to_send}'")
+                    
+                    if self.log_level == 'DEBUG':
+                        before = self.capture_pane()
+                        logger.debug(f"\n--- Before {step.key} ---\n{before}\n--- End Before {step.key} ---")
+                    
+                    self.run_tmux(['send-keys', '-t', self.session, key_to_send])
+                    time.sleep(0.25)
+                    
+                    if self.log_level == 'DEBUG':
+                        after = self.capture_pane()
+                        logger.debug(f"\n--- After {step.key} ---\n{after}\n--- End After {step.key} ---")
+                    
+                    self.capture_debug_screen(f"after_send_key_{step.key}")
+                elif isinstance(step, SleepAction):
+                    time.sleep(step.seconds)
+                elif isinstance(step, CaptureAction):
+                    capture = self.capture_pane()
+                    timestamp = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+                    host_dir = os.path.join(os.getcwd(), 'captures', self.host)
+                    os.makedirs(host_dir, exist_ok=True)
+                    
+                    base_name = step.filename or 'capture'
+                    final_filename = f"{base_name}_{timestamp}.txt"
+                    save_path = os.path.join(host_dir, final_filename)
+                    
+                    with open(save_path, 'w') as f:
+                        f.write(capture)
+                    logger.info(f"[Capture] Saved to {save_path}")
+                elif isinstance(step, WaitForTextAction):
+                    self.wait_for_text(
+                        step.text, 
+                        step.timeout_seconds, 
+                        step.row, 
+                        step.col, 
+                        step.end_row, 
+                        step.end_col, 
+                        step.is_message_line
+                    )
+                    safe_text = "".join([c if c.isalnum() else "_" for c in step.text])
+                    self.capture_debug_screen(f"after_wait_for_{safe_text}")
+                elif isinstance(step, PressKeyIfTextPresentAction):
+                    settle_time = step.wait_ms / 1000.0 if step.wait_ms is not None else 0.25
+                    if settle_time > 0:
+                        time.sleep(settle_time)
+                    
+                    found, last_content = self.wait_for_text_internal(
+                        step.text,
+                        step.timeout_seconds,
+                        step.row,
+                        step.col,
+                        step.end_row,
+                        step.end_col,
+                        step.is_message_line
+                    )
+
+                    if found:
+                        press_key = KEY_MAP.get(step.key, step.key)
+                        logger.info(f"[Condition] Text \"{step.text}\" found. Sending key: {step.key} -> tmux: {press_key}")
+                        self.run_tmux(['send-keys', '-t', self.session, press_key])
+                        time.sleep(0.25)
+                    else:
+                        logger.info(f"[Condition] Text \"{step.text}\" not found after {step.timeout_seconds}s. Skipping.")
+                
+                self.capture_pane()
+            
+            logger.info("Automation complete!")
         
-        logger.info("Automation complete!")
+        finally:
+            self.terminate_session()
