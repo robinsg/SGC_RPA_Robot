@@ -1,5 +1,5 @@
 # Python cache and compiled files
-__pycache__/
+robot_py/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -39,3 +39,5 @@ captures/*
 
 # Backups
 ts_backup/
+
+

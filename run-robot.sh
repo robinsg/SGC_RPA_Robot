@@ -125,7 +125,10 @@ log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
 tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
 
 # Robustness Check: Wait a moment and verify the session started.
-sleep 1
+# A longer delay helps prevent a race condition where the python script
+# starts before tn5250 has connected or had a chance to fail.
+sleep 2
+
 if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
     log_message "Error: Failed to start tmux session '$TMUX_SESSION'."
     log_message "This is often caused by an invalid hostname or tn5250 command error."
