@@ -7,13 +7,13 @@
     },
     {
       "name": "YAML Action Schema",
-      "description": "Valid actions: wait_for_text, send_text, send_key, sleep, capture, press_key_if_text_present. Check src/robot/schema.ts before adding new ones.",
+      "description": "Valid actions: wait_for_text, send_text, send_key, sleep, capture, press_key_if_text_present. Check robot_py/schema.py before adding new ones.",
       "pattern": "**/*.yaml"
     },
     {
       "name": "Tmux Session Safety",
       "description": "Always check if the tmux session defined in the YAML exists before attempting to send keys or capture content.",
-      "pattern": "src/robot/**/*.ts"
+      "pattern": "robot_py/**/*.py"
     }
   ]
 }
