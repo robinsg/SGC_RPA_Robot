@@ -4,7 +4,12 @@ import time
 import json
 from datetime import datetime
 from typing import Optional, List, Tuple
-from .schema import parse_robot_script, RobotScript, Action, SendTextAction, SendKeyAction, WaitForTextAction, SleepAction, CaptureAction, PressKeyIfTextPresentAction
+from .schema import (
+    parse_robot_script, RobotScript, Action, SendTextAction, SendKeyAction,
+    WaitForTextAction, SleepAction, CaptureAction, PressKeyIfTextPresentAction,
+    MoveCursorAction, SearchAndMoveCursorAction, SearchExtractAndSendAction,
+    ExtractAtCursorAndSendAction
+)
 from .logger import logger
 
 KEY_MAP = {
@@ -71,6 +76,41 @@ class RobotEngine:
         else:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
 
+    def validate_coords(self, row: int, col: int):
+        if not (1 <= row <= self.max_rows):
+            raise ValueError(f"Row {row} out of bounds (1-{self.max_rows})")
+        if not (1 <= col <= self.max_cols):
+            raise ValueError(f"Column {col} out of bounds (1-{self.max_cols})")
+
+    def validate_block(self, row: int, col: int, end_row: int, end_col: int):
+        self.validate_coords(row, col)
+        self.validate_coords(end_row, end_col)
+        if row > end_row or col > end_col:
+            raise ValueError(f"Invalid block: ({row},{col}) to ({end_row},{end_col})")
+
+    def get_cursor_position(self) -> Tuple[int, int]:
+        # tmux uses 0-indexed coords, robot uses 1-indexed
+        res = self.run_tmux(['display-message', '-p', '-t', self.session, '#{cursor_y},#{cursor_x}'])
+        y, x = map(int, res.strip().split(','))
+        return y + 1, x + 1
+
+    def move_cursor(self, target_row: int, target_col: int):
+        self.validate_coords(target_row, target_col)
+        curr_row, curr_col = self.get_cursor_position()
+
+        row_diff = target_row - curr_row
+        col_diff = target_col - curr_col
+
+        if row_diff > 0:
+            for _ in range(row_diff): self.run_tmux(['send-keys', '-t', self.session, 'Down'])
+        elif row_diff < 0:
+            for _ in range(-row_diff): self.run_tmux(['send-keys', '-t', self.session, 'Up'])
+
+        if col_diff > 0:
+            for _ in range(col_diff): self.run_tmux(['send-keys', '-t', self.session, 'Right'])
+        elif col_diff < 0:
+            for _ in range(-col_diff): self.run_tmux(['send-keys', '-t', self.session, 'Left'])
+
     def capture_pane(self) -> str:
         pane_content = self.run_tmux(['capture-pane', '-t', self.session, '-p'])
         
@@ -100,10 +140,12 @@ class RobotEngine:
             return text in line
         elif row is not None and col is not None and end_row is not None and end_col is not None:
             # Coordinates are 1-indexed in YAML
+            self.validate_block(row, col, end_row, end_col)
             search_area_lines = lines[row-1:end_row]
             search_area = "\n".join([line[col-1:end_col] for line in search_area_lines])
             return text in search_area
         elif row is not None:
+            self.validate_coords(row, col or 1)
             line = lines[row-1] if len(lines) > row-1 else ''
             if col is not None:
                 return text in line[col-1:]
@@ -111,6 +153,16 @@ class RobotEngine:
                 return text in line
         else:
             return text in pane_content
+
+    def find_text_in_block(self, pane_content: str, text: str, row: int, col: int, end_row: int, end_col: int) -> Optional[int]:
+        self.validate_block(row, col, end_row, end_col)
+        lines = pane_content.splitlines()
+        for i in range(row-1, end_row):
+            if i >= len(lines): break
+            line_part = lines[i][col-1:end_col]
+            if text in line_part:
+                return i + 1
+        return None
 
     def wait_for_text_internal(self, text: str, timeout: int, row=None, col=None, end_row=None, end_col=None, is_message_line=None) -> Tuple[bool, str]:
         start_time = time.time()
@@ -235,6 +287,38 @@ class RobotEngine:
                         time.sleep(0.25)
                     else:
                         logger.info(f"[Condition] Text \"{step.text}\" not found after {step.timeout_seconds}s. Skipping.")
+                elif isinstance(step, MoveCursorAction):
+                    logger.info(f"[Cursor] Moving to row {step.row}, col {step.col}")
+                    self.move_cursor(step.row, step.col)
+                elif isinstance(step, SearchAndMoveCursorAction):
+                    found, last_content = self.wait_for_text_internal(
+                        step.text, step.timeout_seconds, step.row, step.col, step.end_row, step.end_col
+                    )
+                    if not found:
+                        raise RuntimeError(f"Timeout waiting for \"{step.text}\" in block for SearchAndMoveCursorAction")
+
+                    match_row = self.find_text_in_block(last_content, step.text, step.row, step.col, step.end_row, step.end_col)
+                    logger.info(f"[SearchMove] Found \"{step.text}\" at row {match_row}. Moving cursor to col {step.target_col}")
+                    self.move_cursor(match_row, step.target_col)
+                elif isinstance(step, SearchExtractAndSendAction):
+                    found, last_content = self.wait_for_text_internal(
+                        step.text, step.timeout_seconds, step.row, step.col, step.end_row, step.end_col
+                    )
+                    if not found:
+                        raise RuntimeError(f"Timeout waiting for \"{step.text}\" in block for SearchExtractAndSendAction")
+
+                    match_row = self.find_text_in_block(last_content, step.text, step.row, step.col, step.end_row, step.end_col)
+                    lines = last_content.splitlines()
+                    extracted = lines[match_row-1][step.extract_col-1 : step.extract_col-1 + step.extract_length].strip()
+                    logger.info(f"[SearchExtract] Found \"{step.text}\" at row {match_row}. Extracted \"{extracted}\" from col {step.extract_col}")
+                    self.run_tmux(['send-keys', '-l', '-t', self.session, extracted])
+                elif isinstance(step, ExtractAtCursorAndSendAction):
+                    row, col = self.get_cursor_position()
+                    last_content = self.capture_pane()
+                    lines = last_content.splitlines()
+                    extracted = lines[row-1][col-1 : col-1 + step.length].strip()
+                    logger.info(f"[CursorExtract] Extracted \"{extracted}\" from row {row}, col {col}")
+                    self.run_tmux(['send-keys', '-l', '-t', self.session, extracted])
                 
                 self.capture_pane()
             

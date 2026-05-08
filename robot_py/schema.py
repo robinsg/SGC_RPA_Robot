@@ -24,6 +24,14 @@ class Action:
             return CaptureAction(**data)
         elif action_type == 'press_key_if_text_present':
             return PressKeyIfTextPresentAction(**data)
+        elif action_type == 'move_cursor':
+            return MoveCursorAction(**data)
+        elif action_type == 'search_and_move_cursor':
+            return SearchAndMoveCursorAction(**data)
+        elif action_type == 'search_extract_and_send':
+            return SearchExtractAndSendAction(**data)
+        elif action_type == 'extract_at_cursor_and_send':
+            return ExtractAtCursorAndSendAction(**data)
         else:
             raise ValueError(f"Unknown action type: {action_type}")
 
@@ -66,6 +74,36 @@ class PressKeyIfTextPresentAction(Action):
     timeout_seconds: int = 2
 
 @dataclass
+class MoveCursorAction(Action):
+    row: int = 1
+    col: int = 1
+
+@dataclass
+class SearchAndMoveCursorAction(Action):
+    text: str = ""
+    row: int = 1
+    col: int = 1
+    end_row: int = 1
+    end_col: int = 1
+    target_col: int = 1
+    timeout_seconds: int = 10
+
+@dataclass
+class SearchExtractAndSendAction(Action):
+    text: str = ""
+    row: int = 1
+    col: int = 1
+    end_row: int = 1
+    end_col: int = 1
+    extract_col: int = 1
+    extract_length: int = 1
+    timeout_seconds: int = 10
+
+@dataclass
+class ExtractAtCursorAndSendAction(Action):
+    length: int = 1
+
+@dataclass
 class RobotDefaults:
     wait_timeout: int = 5
     typing_delay_ms: int = 50
@@ -82,12 +120,13 @@ def parse_robot_script(yaml_path: str) -> RobotScript:
     with open(yaml_path, 'r') as f:
         content = f.read()
         
-    # Process environment variables: ${VAR_NAME}
+    # Process environment variables: ${VAR_NAME} or ${VAR_NAME:-default}
     def replace_env(match):
         var_name = match.group(1)
-        return os.environ.get(var_name, '')
+        default_val = match.group(2) if match.group(2) else ''
+        return os.environ.get(var_name, default_val)
     
-    processed_content = re.sub(r'\${(\w+)}', replace_env, content)
+    processed_content = re.sub(r'\${(\w+)(?::-(.*?))?}', replace_env, content)
     
     data = yaml.safe_load(processed_content)
     
