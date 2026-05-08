@@ -70,8 +70,17 @@ TN5250_MAP=${TN5250_MAP:-"285"}
 TN5250_DEVICE_TYPE=${TN5250_DEVICE_TYPE:-"IBM-3477-FC"}
 
 TN5250_SSL_FLAG=""
-if [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
+if [ -n "$HMC_HOST" ]; then
+    log_message "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
+    # HMC Proxy requires SSL.
     TN5250_SSL_FLAG="+ssl"
+    # Use HMC host and port 2301 as the connection target
+    CONNECTION_TARGET="${HMC_HOST}:2301"
+elif [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
+    TN5250_SSL_FLAG="+ssl"
+    CONNECTION_TARGET="$TN5250_HOST"
+else
+    CONNECTION_TARGET="$TN5250_HOST"
 fi
 
 # Check if tmux is installed
@@ -117,8 +126,8 @@ else
     exit 1
 fi
 
-# The host must be the last argument for tn5250
-TN_CMD_ARGS+=("$TN5250_HOST")
+# The connection target must be the last argument for tn5250
+TN_CMD_ARGS+=("$CONNECTION_TARGET")
 
 FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
 log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
