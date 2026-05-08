@@ -69,19 +69,36 @@ TMUX_SESSION="robot-${TN5250_HOST}"
 TN5250_MAP=${TN5250_MAP:-"285"}
 TN5250_DEVICE_TYPE=${TN5250_DEVICE_TYPE:-"IBM-3477-FC"}
 
-TN5250_SSL_FLAG=""
+# Determine the required tmux buffer dimensions based on the device type
+if [[ "$TN5250_DEVICE_TYPE" == "IBM-3477-FC" || "$TN5250_DEVICE_TYPE" == "IBM-3477-FG" || "$TN5250_DEVICE_TYPE" == "IBM-3180-2" ]]; then
+    TMUX_SIZE="-x 132 -y 27"
+elif [[ "$TN5250_DEVICE_TYPE" == "IBM-3179-2" || "$TN5250_DEVICE_TYPE" == "IBM-3196-A1" || "$TN5250_DEVICE_TYPE" == "IBM-5292-2" || "$TN5250_DEVICE_TYPE" == "IBM-5291-1" || "$TN5250_DEVICE_TYPE" == "IBM-5251-11" ]]; then
+    TMUX_SIZE="-x 80 -y 24"
+else
+    log_message "Error: Unsupported TN5250_DEVICE_TYPE '$TN5250_DEVICE_TYPE'."
+    exit 1
+fi
+
 if [ -n "$HMC_HOST" ]; then
     log_message "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
-    # HMC Proxy requires SSL.
-    TN5250_SSL_FLAG="+ssl"
-    # Use HMC host and port 2301 as the connection target
-    CONNECTION_TARGET="${HMC_HOST}:2301"
-elif [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
-    TN5250_SSL_FLAG="+ssl"
-    CONNECTION_TARGET="$TN5250_HOST"
+    # Use the simplified connection format requested for HMC
+    FULL_CMD="tn5250 ssl:${HMC_HOST}:2301"
 else
-    CONNECTION_TARGET="$TN5250_HOST"
+    # Build the standard tn5250 command arguments for direct connection
+    TN_CMD_ARGS=("map=$TN5250_MAP" "env.TERM=$TN5250_DEVICE_TYPE")
+    
+    if [ -n "$TN5250_DEVICE_NAME" ]; then
+        TN_CMD_ARGS+=("env.DEVNAME=$TN5250_DEVICE_NAME")
+    fi
+
+    if [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
+        TN_CMD_ARGS+=("+ssl")
+    fi
+    
+    TN_CMD_ARGS+=("$TN5250_HOST")
+    FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
 fi
+
 
 # Check if tmux is installed
 if ! command -v tmux &> /dev/null; then
@@ -101,35 +118,6 @@ fi
 # Track if this script instance created the session (now effectively always true)
 SESSION_CREATED_BY_SCRIPT=true
 log_message "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
-
-# Build the tn5250 command arguments dynamically
-TN_CMD_ARGS=("map=$TN5250_MAP" "env.TERM=$TN5250_DEVICE_TYPE")
-
-# Add DEVNAME only if the variable is set and not empty
-if [ -n "$TN5250_DEVICE_NAME" ]; then
-    TN_CMD_ARGS+=("env.DEVNAME=$TN5250_DEVICE_NAME")
-fi
-
-if [ -n "$TN5250_SSL_FLAG" ]; then
-    TN_CMD_ARGS+=("$TN5250_SSL_FLAG")
-fi
-
-# Determine the required tmux buffer dimensions based on the device type
-# 27x132 models
-if [[ "$TN5250_DEVICE_TYPE" == "IBM-3477-FC" || "$TN5250_DEVICE_TYPE" == "IBM-3477-FG" || "$TN5250_DEVICE_TYPE" == "IBM-3180-2" ]]; then
-    TMUX_SIZE="-x 132 -y 27"
-# 24x80 models
-elif [[ "$TN5250_DEVICE_TYPE" == "IBM-3179-2" || "$TN5250_DEVICE_TYPE" == "IBM-3196-A1" || "$TN5250_DEVICE_TYPE" == "IBM-5292-2" || "$TN5250_DEVICE_TYPE" == "IBM-5291-1" || "$TN5250_DEVICE_TYPE" == "IBM-5251-11" ]]; then
-    TMUX_SIZE="-x 80 -y 24"
-else
-    log_message "Error: Unsupported TN5250_DEVICE_TYPE '$TN5250_DEVICE_TYPE'."
-    exit 1
-fi
-
-# The connection target must be the last argument for tn5250
-TN_CMD_ARGS+=("$CONNECTION_TARGET")
-
-FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
 log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
 tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
 
