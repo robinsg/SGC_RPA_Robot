@@ -3,6 +3,7 @@ from typing import List, Optional, Union, Any, Dict
 import yaml
 import os
 import re
+from io import StringIO
 
 @dataclass
 class Action:
@@ -116,21 +117,68 @@ class RobotScript:
     tmux_session: str = "5250_robot"
     defaults: RobotDefaults = field(default_factory=RobotDefaults)
 
-def parse_robot_script(yaml_path: str) -> RobotScript:
-    with open(yaml_path, 'r') as f:
-        content = f.read()
-        
+def replace_env_vars(content: str) -> str:
     # Process environment variables: ${VAR_NAME} or ${VAR_NAME:-default}
     def replace_env(match):
         var_name = match.group(1)
         default_val = match.group(2) if match.group(2) else ''
         return os.environ.get(var_name, default_val)
     
-    processed_content = re.sub(r'\${(\w+)(?::-(.*?))?}', replace_env, content)
+    return re.sub(r'\${(\w+)(?::-(.*?))?}', replace_env, content)
+
+class RobotLoader(yaml.SafeLoader):
+    def __init__(self, stream):
+        self._root = os.path.split(stream.name)[0] if hasattr(stream, 'name') and stream.name else os.getcwd()
+        super(RobotLoader, self).__init__(stream)
+
+    def include(self, node):
+        filename = os.path.join(self._root, self.construct_scalar(node))
+        return load_yaml_file(filename)
+
+RobotLoader.add_constructor('!include', RobotLoader.include)
+
+def load_yaml_file(filepath: str) -> Any:
+    with open(filepath, 'r') as f:
+        content = f.read()
     
-    data = yaml.safe_load(processed_content)
+    processed_content = replace_env_vars(content)
     
-    steps = [Action.from_dict(step) for step in data.get('steps', [])]
+    stream = StringIO(processed_content)
+    stream.name = filepath
+
+    return yaml.load(stream, Loader=RobotLoader)
+
+def parse_robot_script(yaml_path: str) -> RobotScript:
+    data = load_yaml_file(yaml_path)
+
+    # Handle top-level include (inheritance)
+    if 'include' in data:
+        parent_path = os.path.join(os.path.dirname(yaml_path), data['include'])
+        parent_data = load_yaml_file(parent_path)
+        # Merge: parent_data then data overrides
+        merged_data = parent_data.copy()
+
+        # Special handling for steps - if child has steps, they might want to append or override?
+        # Requirement says: "inherit base configurations (like tmux_session or defaults) which can then be overridden"
+        # Usually it's a merge of the top-level dict.
+        for key, value in data.items():
+            if key == 'include':
+                continue
+            if key == 'defaults' and 'defaults' in merged_data:
+                merged_data['defaults'].update(value)
+            else:
+                merged_data[key] = value
+        data = merged_data
+
+    raw_steps = data.get('steps', [])
+    flattened_steps = []
+    for step in raw_steps:
+        if isinstance(step, list):
+            flattened_steps.extend(step)
+        else:
+            flattened_steps.append(step)
+
+    steps = [Action.from_dict(step) for step in flattened_steps]
     
     defaults_data = data.get('defaults', {})
     defaults = RobotDefaults(
