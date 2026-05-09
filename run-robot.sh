@@ -61,6 +61,29 @@ fi
 # This prevents the .env file from overriding the LPAR context.
 export TN5250_HOST=$LPAR_NAME_LOWER
 
+# --- Connectivity Check ---
+if [ -n "$HMC_HOST" ]; then
+    CHECK_HOST="$HMC_HOST"
+    CHECK_PORT=2301
+else
+    CHECK_HOST="$TN5250_HOST"
+    if [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
+        # Default to 992 for SSL, but allow override via TN5250_PORT
+        CHECK_PORT=${TN5250_PORT:-992}
+    else
+        CHECK_PORT=${TN5250_PORT:-23}
+    fi
+fi
+
+log_message "Testing connectivity to ${CHECK_HOST}:${CHECK_PORT}..."
+# timeout 2s, 2>/dev/null to suppress 'connection refused' bash errors
+if ! timeout 2 bash -c "true > /dev/tcp/${CHECK_HOST}/${CHECK_PORT}" 2>/dev/null; then
+    log_message "Error: Port ${CHECK_PORT} on host ${CHECK_HOST} is not reachable."
+    log_message "Ensure your VPN is connected or the target system is up."
+    exit 1
+fi
+log_message "Connectivity test passed."
+
 # Unconditionally set the session name based on the host. This prevents
 # a value from the .env file from causing a mismatch.
 TMUX_SESSION="robot-${TN5250_HOST}"
