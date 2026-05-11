@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # --- Logging Setup ---
 LOG_DIR="logs"
@@ -60,7 +60,7 @@ fi
 # --- Variable Assignment & Integrity ---
 # The command-line LPAR name is the source of truth for the host.
 # This prevents the .env file from overriding the LPAR context.
-export TN5250_HOST=$LPAR_NAME_LOWER
+export TN5250_HOST="$LPAR_NAME_LOWER"
 
 # --- Connectivity Check ---
 if [ -n "$HMC_HOST" ]; then
@@ -95,32 +95,32 @@ TN5250_DEVICE_TYPE=${TN5250_DEVICE_TYPE:-"IBM-3477-FC"}
 
 # Determine the required tmux buffer dimensions based on the device type
 if [[ "$TN5250_DEVICE_TYPE" == "IBM-3477-FC" || "$TN5250_DEVICE_TYPE" == "IBM-3477-FG" || "$TN5250_DEVICE_TYPE" == "IBM-3180-2" ]]; then
-    TMUX_SIZE="-x 132 -y 27"
+    TMUX_SIZE=(-x 132 -y 27)
 elif [[ "$TN5250_DEVICE_TYPE" == "IBM-3179-2" || "$TN5250_DEVICE_TYPE" == "IBM-3196-A1" || "$TN5250_DEVICE_TYPE" == "IBM-5292-2" || "$TN5250_DEVICE_TYPE" == "IBM-5291-1" || "$TN5250_DEVICE_TYPE" == "IBM-5251-11" ]]; then
-    TMUX_SIZE="-x 80 -y 24"
+    TMUX_SIZE=(-x 80 -y 24)
 else
     log_message "Error: Unsupported TN5250_DEVICE_TYPE '$TN5250_DEVICE_TYPE'."
     exit 1
 fi
 
-if [ -n "$HMC_HOST" ]; then
+if [ -n "${HMC_HOST:-}" ]; then
     log_message "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
     # Use the simplified connection format requested for HMC
-    FULL_CMD="tn5250 ssl:${HMC_HOST}:2301"
+    FULL_CMD=(tn5250 "ssl:${HMC_HOST}:2301")
 else
     # Build the standard tn5250 command arguments for direct connection
     TN_CMD_ARGS=("map=$TN5250_MAP" "env.TERM=$TN5250_DEVICE_TYPE")
     
-    if [ -n "$TN5250_DEVICE_NAME" ]; then
+    if [ -n "${TN5250_DEVICE_NAME:-}" ]; then
         TN_CMD_ARGS+=("env.DEVNAME=$TN5250_DEVICE_NAME")
     fi
 
-    if [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
+    if [ "${TN5250_SSL:-}" = "on" ] || [ "${TN5250_SSL:-}" = "True" ]; then
         TN_CMD_ARGS+=("+ssl")
     fi
     
     TN_CMD_ARGS+=("$TN5250_HOST")
-    FULL_CMD="tn5250 ${TN_CMD_ARGS[*]}"
+    FULL_CMD=(tn5250 "${TN_CMD_ARGS[@]}")
 fi
 
 
@@ -142,9 +142,8 @@ fi
 # Track if this script instance created the session (now effectively always true)
 SESSION_CREATED_BY_SCRIPT=true
 log_message "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
-log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
-# shellcheck disable=SC2086
-tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
+log_message "Executing: ${FULL_CMD[*]} with window size ${TMUX_SIZE[*]}"
+tmux new-session -d -s "$TMUX_SESSION" "${TMUX_SIZE[@]}" "${FULL_CMD[@]}"
 
 # Robustness Check: Wait a moment and verify the session started.
 # A longer delay helps prevent a race condition where the python script
@@ -166,7 +165,11 @@ export TMUX_SESSION
 # Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
 set +e
 log_message "--- Starting RPA Automation (Python) ---"
-export PYTHONPATH=$PYTHONPATH:.
+if [ -z "${PYTHONPATH:-}" ]; then
+    export PYTHONPATH="."
+else
+    export PYTHONPATH="${PYTHONPATH}:."
+fi
 python3 -m robot_py.cli "$YAML_FILE"
 EXIT_CODE=$?
 set -e # Re-enable exit on error
@@ -186,4 +189,4 @@ if [ "$SESSION_CREATED_BY_SCRIPT" = true ]; then
     fi
 fi
 
-exit $EXIT_CODE
+exit "$EXIT_CODE"
