@@ -49,6 +49,7 @@ if [ -f "$ENV_FILE" ]; then
   log_message "Loading environment variables from $ENV_FILE"
   # allexport ensures all variables in the sourced file are exported
   set -o allexport
+  # shellcheck source=/dev/null
   source "$ENV_FILE"
   set +o allexport
 else
@@ -142,6 +143,7 @@ fi
 SESSION_CREATED_BY_SCRIPT=true
 log_message "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
 log_message "Executing: $FULL_CMD with window size $TMUX_SIZE"
+# shellcheck disable=SC2086
 tmux new-session -d -s "$TMUX_SESSION" $TMUX_SIZE "$FULL_CMD"
 
 # Robustness Check: Wait a moment and verify the session started.
