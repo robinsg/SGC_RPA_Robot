@@ -3,6 +3,7 @@ import os
 from .engine import RobotEngine
 from .logger import logger
 
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 -m robot_py.cli <path_to_yaml>")
@@ -15,10 +16,12 @@ def main():
         engine.run()
     except Exception as e:
         logger.error(f"Error: {str(e)}")
-        if os.environ.get('LOG_LEVEL') == 'DEBUG':
+        if os.environ.get("LOG_LEVEL") == "DEBUG":
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

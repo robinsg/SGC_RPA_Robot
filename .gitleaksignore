@@ -1,0 +1,12 @@
+# Ignore placeholder secrets in .env.example and README.md
+# Format is Fingerprint (from gitleaks output)
+645c5cfc4e345d45df34fd7b6f8a0a2ad0be18cf:.env.example:hashicorp-tf-password:3
+645c5cfc4e345d45df34fd7b6f8a0a2ad0be18cf:README.md:hashicorp-tf-password:75
+221875c8bd023660d4e2ba9d40258b8f0f547875:.env.example:hashicorp-tf-password:3
+221875c8bd023660d4e2ba9d40258b8f0f547875:README.md:hashicorp-tf-password:75
+d703a7884d8365b28181dd4bc0a30ed43c477a21:.env.example:hashicorp-tf-password:3
+d703a7884d8365b28181dd4bc0a30ed43c477a21:README.md:hashicorp-tf-password:75
+989139b8e8e50d112d32b70a0ac03b22d653257f:.env.example:hashicorp-tf-password:3
+989139b8e8e50d112d32b70a0ac03b22d653257f:README.md:hashicorp-tf-password:75
+312978c382ce93823bb1cf8af3388da782a85dd8:.env.example:hashicorp-tf-password:13
+312978c382ce93823bb1cf8af3388da782a85dd8:README.md:hashicorp-tf-password:75
