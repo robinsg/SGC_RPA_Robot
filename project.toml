@@ -1,0 +1,23 @@
+[tool.ruff]
+target-version = "py312"
+# Exclude directories that shouldn't be linted
+exclude = [
+    ".git",
+    "__pycache__",
+    "captures",
+    "logs",
+    ".venv",
+]
+
+[tool.black]
+target-version = ["py312"]
+# Regex to exclude directories from formatting
+exclude = '''
+/(
+    captures
+  | logs
+  | \.git
+  | \.venv
+  | __pycache__
+)/
+'''
