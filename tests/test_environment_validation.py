@@ -68,6 +68,7 @@ def test_validate_environment_hmc_success(monkeypatch):
     validate_environment()
 
 
+<<<<<<< HEAD
 @pytest.mark.parametrize(
     "missing_var",
     [
@@ -85,11 +86,18 @@ def test_validate_environment_hmc_missing_var(monkeypatch, missing_var):
     monkeypatch.setenv("HMC_HOST", "hmc_host")
     monkeypatch.setenv("HMC_USER", "hmc_user")
     monkeypatch.setenv("HMC_PWD", "hmc_pwd")
+=======
+def test_validate_environment_hmc_missing_var(monkeypatch):
+    monkeypatch.setenv("HMC_HOST", "hmc_host")
+    monkeypatch.setenv("HMC_USER", "hmc_user")
+    # HMC_PWD missing
+>>>>>>> 338b748 (feat: validate required environment variables at startup)
     monkeypatch.setenv("HMC_SYSNAME", "sysname")
     monkeypatch.setenv("HMC_LPARNAME", "lparname")
     monkeypatch.setenv("HMC_SESSION_KEY", "session_key")
     monkeypatch.setenv("TN5250_USER", "tn_user")
     monkeypatch.setenv("TN5250_PASSWORD", "tn_password")
+<<<<<<< HEAD
     monkeypatch.delenv(missing_var, raising=False)
 
     with pytest.raises(
@@ -101,11 +109,21 @@ def test_validate_environment_hmc_missing_var(monkeypatch, missing_var):
 
 def test_validate_environment_invalid_device_type(monkeypatch):
     """Test validation failure for an unsupported device type."""
+=======
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_environment()
+    assert "HMC_PWD" in str(excinfo.value)
+
+
+def test_validate_environment_invalid_device_type(monkeypatch):
+>>>>>>> 338b748 (feat: validate required environment variables at startup)
     monkeypatch.setenv("TN5250_HOST", "test_host")
     monkeypatch.setenv("TN5250_USER", "test_user")
     monkeypatch.setenv("TN5250_PASSWORD", "test_password")
     monkeypatch.setenv("TN5250_DEVICE_TYPE", "INVALID_DEVICE")
 
+<<<<<<< HEAD
     with pytest.raises(
         ValueError, match=r"Unsupported TN5250_DEVICE_TYPE: INVALID_DEVICE"
     ):
@@ -114,12 +132,21 @@ def test_validate_environment_invalid_device_type(monkeypatch):
 
 def test_validate_environment_valid_device_type(monkeypatch):
     """Test successful validation with a valid device type."""
+=======
+    with pytest.raises(ValueError) as excinfo:
+        validate_environment()
+    assert "Unsupported TN5250_DEVICE_TYPE: INVALID_DEVICE" in str(excinfo.value)
+
+
+def test_validate_environment_valid_device_type(monkeypatch):
+>>>>>>> 338b748 (feat: validate required environment variables at startup)
     monkeypatch.setenv("TN5250_HOST", "test_host")
     monkeypatch.setenv("TN5250_USER", "test_user")
     monkeypatch.setenv("TN5250_PASSWORD", "test_password")
     monkeypatch.setenv("TN5250_DEVICE_TYPE", SUPPORTED_24x80[0])
     # Should not raise
     validate_environment()
+<<<<<<< HEAD
 
 
 def test_robot_engine_init_validation_failure(monkeypatch, tmp_path):
@@ -135,3 +162,5 @@ def test_robot_engine_init_validation_failure(monkeypatch, tmp_path):
         match="Missing required environment variables for Direct IP connection: TN5250_HOST",
     ):
         RobotEngine(str(yaml_file))
+=======
+>>>>>>> 338b748 (feat: validate required environment variables at startup)
