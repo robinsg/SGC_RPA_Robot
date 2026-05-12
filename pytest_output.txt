@@ -1,0 +1,9 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0
+rootdir: /home/robinsg/development/SGC_RPA_Robot
+collected 18 items
+
+tests/test_environment_validation.py .................                   [ 94%]
+tests/test_placeholder.py .                                              [100%]
+
+============================== 18 passed in 0.07s ==============================
