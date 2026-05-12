@@ -77,12 +77,12 @@ The robot loads its configuration from environment files that are specific to th
     # Connection Settings
     TN5250_MAP="285"   # Keymap (e.g., 285 for UK, 37 for US)
     TN5250_SSL="on"    # "on" or "off"
-    
+
     # Supported Terminal Types:
     # 27x132: IBM-3477-FC, IBM-3477-FG, IBM-3180-2
     # 24x80:  IBM-3179-2, IBM-3196-A1, IBM-5292-2, IBM-5291-1, IBM-5251-11
     TN5250_DEVICE_TYPE="IBM-3477-FC"
-    
+
     TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
     ```
 
@@ -101,32 +101,32 @@ steps:
     text: "User"
     timeout_seconds: 10
     description: "Wait for login screen"
-    
+
   - type: "send_text"
     text: "${TN5250_USER}" # Injects variable from .env file
-    
+
   - type: "send_key"
     key: "Enter"
-    
+
   - type: "wait_for_text"
     text: "Password"
-    
+
   - type: "send_text"
     text: "${TN5250_PASSWORD}"
-    
+
   - type: "send_key"
     key: "Enter"
-    
+
   - type: "press_key_if_text_present"
     text: "Sign On Information"
     key: "Enter"
     description: "Skip optional info screen"
-    
+
   - type: "wait_for_text"
     text: "IBM i Main Menu"
     row: 1
     col: 33
-    
+
   - type: "capture"
     filename: "main_menu"
 ```
@@ -156,4 +156,3 @@ Debug captures are stored in `logs/captures/<host>/`.
 - `captures/`: Directory containing host-specific screen captures.
 - `logs/`: Application logs and debug captures.
 - `.env.<lpar>`: (Untracked) LPAR-specific configuration.
-
