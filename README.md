@@ -33,17 +33,20 @@ The machine running the robot must have the required software installed. This in
 #### For Debian/Ubuntu-based systems:
 
 1.  **Install Build Dependencies and Core Tools**:
+
     ```bash
     sudo apt update
     sudo apt install -y git build-essential automake autoconf libncurses-dev pkg-config tmux python3 python3-pip
     ```
 
 2.  **Install Python Dependencies**:
+
     ```bash
     pip install -r requirements.txt
     ```
 
 3.  **Build and Install `tn5250` from Source**:
+
     ```bash
     # Clone the official repository
     git clone https://github.com/tn5250j/tn5250.git
@@ -69,6 +72,7 @@ The robot loads its configuration from environment files that are specific to th
 2.  **Add Configuration Variables**:
 
     **Example for `.env.pub400.com`:**
+
     ```env
     # Credentials for the target system
     TN5250_USER="YOUR_USERNAME"
@@ -77,12 +81,12 @@ The robot loads its configuration from environment files that are specific to th
     # Connection Settings
     TN5250_MAP="285"   # Keymap (e.g., 285 for UK, 37 for US)
     TN5250_SSL="on"    # "on" or "off"
-    
+
     # Supported Terminal Types:
     # 27x132: IBM-3477-FC, IBM-3477-FG, IBM-3180-2
     # 24x80:  IBM-3179-2, IBM-3196-A1, IBM-5292-2, IBM-5291-1, IBM-5251-11
     TN5250_DEVICE_TYPE="IBM-3477-FC"
-    
+
     TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
     ```
 
@@ -91,6 +95,7 @@ The robot loads its configuration from environment files that are specific to th
 Create a YAML file. The engine uses a structured format where steps are defined within a `steps` array.
 
 **`my_automation.yaml`:**
+
 ```yaml
 name: "Log in and Navigate"
 description: "A sample script to log in and capture the main menu"
@@ -101,32 +106,32 @@ steps:
     text: "User"
     timeout_seconds: 10
     description: "Wait for login screen"
-    
+
   - type: "send_text"
     text: "${TN5250_USER}" # Injects variable from .env file
-    
+
   - type: "send_key"
     key: "Enter"
-    
+
   - type: "wait_for_text"
     text: "Password"
-    
+
   - type: "send_text"
     text: "${TN5250_PASSWORD}"
-    
+
   - type: "send_key"
     key: "Enter"
-    
+
   - type: "press_key_if_text_present"
     text: "Sign On Information"
     key: "Enter"
     description: "Skip optional info screen"
-    
+
   - type: "wait_for_text"
     text: "IBM i Main Menu"
     row: 1
     col: 33
-    
+
   - type: "capture"
     filename: "main_menu"
 ```
@@ -141,19 +146,20 @@ chmod +x run-robot.sh
 ```
 
 #### Debug Mode
+
 To see detailed logs and automatic screen captures for every step:
+
 ```bash
 LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
 ```
+
 Debug captures are stored in `logs/captures/<host>/`.
 
 ## 📁 Project Structure
 
 - `robot_py/`: The core RPA engine logic (Python).
-- `ts_backup/`: Original TypeScript and React code (Archived).
 - `run-robot.sh`: The main entry point shell script.
 - `example_script.yaml`: A sample automation workflow.
 - `captures/`: Directory containing host-specific screen captures.
 - `logs/`: Application logs and debug captures.
 - `.env.<lpar>`: (Untracked) LPAR-specific configuration.
-
