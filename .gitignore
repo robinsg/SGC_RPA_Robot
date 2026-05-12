@@ -37,5 +37,8 @@ captures/*
 *.yaml
 !example*.yaml
 
+# Backups
+ts_backup/
+
 # Testing
 nohup.out
