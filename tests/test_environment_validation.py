@@ -14,7 +14,7 @@ def test_validate_environment_direct_success(monkeypatch):
 @pytest.mark.parametrize(
     "missing_var", ["TN5250_HOST", "TN5250_USER", "TN5250_PASSWORD"]
 )
-def test_validate_environment_direct_missing_vars(monkeypatch, missing_var):
+def test_validate_environment_direct_missing_var(monkeypatch, missing_var):
     """Test validation failure for various missing variables in direct IP mode."""
     monkeypatch.setenv("TN5250_HOST", "test_host")
     monkeypatch.setenv("TN5250_USER", "test_user")
@@ -80,7 +80,7 @@ def test_validate_environment_hmc_success(monkeypatch):
         "TN5250_PASSWORD",
     ],
 )
-def test_validate_environment_hmc_missing_vars(monkeypatch, missing_var):
+def test_validate_environment_hmc_missing_var(monkeypatch, missing_var):
     """Test validation failure for various missing variables in HMC proxy mode."""
     monkeypatch.setenv("HMC_HOST", "hmc_host")
     monkeypatch.setenv("HMC_USER", "hmc_user")
