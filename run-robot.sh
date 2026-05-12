@@ -63,12 +63,12 @@ fi
 export TN5250_HOST="$LPAR_NAME_LOWER"
 
 # --- Connectivity Check ---
-if [ -n "$HMC_HOST" ]; then
-    CHECK_HOST="$HMC_HOST"
+if [ -n "${HMC_HOST:-}" ]; then
+    CHECK_HOST="${HMC_HOST:-}"
     CHECK_PORT=2301
 else
     CHECK_HOST="$TN5250_HOST"
-    if [ "$TN5250_SSL" = "on" ] || [ "$TN5250_SSL" = "True" ]; then
+    if [ "${TN5250_SSL:-}" = "on" ] || [ "${TN5250_SSL:-}" = "True" ]; then
         # Default to 992 for SSL, but allow override via TN5250_PORT
         CHECK_PORT=${TN5250_PORT:-992}
     else
@@ -106,7 +106,7 @@ fi
 if [ -n "${HMC_HOST:-}" ]; then
     log_message "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
     # Use the simplified connection format requested for HMC
-    FULL_CMD=(tn5250 "ssl:${HMC_HOST}:2301")
+    FULL_CMD=(tn5250 "ssl:${HMC_HOST:-}:2301")
 else
     # Build the standard tn5250 command arguments for direct connection
     TN_CMD_ARGS=("map=$TN5250_MAP" "env.TERM=$TN5250_DEVICE_TYPE")

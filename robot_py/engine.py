@@ -63,8 +63,58 @@ SUPPORTED_24x80 = [
 ]
 
 
+def validate_environment():
+    """Validates that required environment variables are set and non-empty.
+
+    Checks for required variables based on whether a direct IP connection
+    or an HMC 5250 Proxy connection is being used. Also validates that
+    TN5250_DEVICE_TYPE is a supported terminal type.
+
+    Raises:
+        ValueError: If any required environment variable is missing or empty,
+            or if TN5250_DEVICE_TYPE is unsupported.
+    """
+    hmc_host = os.environ.get("HMC_HOST")
+    missing_vars = []
+
+    # Required for both
+    common_required = ["TN5250_USER", "TN5250_PASSWORD"]
+    for var in common_required:
+        if not os.environ.get(var):
+            missing_vars.append(var)
+
+    if hmc_host:
+        # HMC specific required variables
+        hmc_required = [
+            "HMC_USER",
+            "HMC_PWD",
+            "HMC_SYSNAME",
+            "HMC_LPARNAME",
+            "HMC_SESSION_KEY",
+        ]
+        for var in hmc_required:
+            if not os.environ.get(var):
+                missing_vars.append(var)
+    else:
+        # Direct IP specific required variables
+        if not os.environ.get("TN5250_HOST"):
+            missing_vars.append("TN5250_HOST")
+
+    if missing_vars:
+        mode = "HMC Proxy" if hmc_host else "Direct IP"
+        raise ValueError(
+            f"Missing required environment variables for {mode} connection: {', '.join(missing_vars)}"
+        )
+
+    # Validate device type if it's set
+    device_type = os.environ.get("TN5250_DEVICE_TYPE")
+    if device_type and device_type not in (SUPPORTED_27x132 + SUPPORTED_24x80):
+        raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
+
+
 class RobotEngine:
     def __init__(self, yaml_path: str):
+        validate_environment()
         self.script = parse_robot_script(yaml_path)
         self.session = os.environ.get("TMUX_SESSION", self.script.tmux_session)
         self.host = os.environ.get("TN5250_HOST", "unknown_host")

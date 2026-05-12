@@ -28,8 +28,8 @@ steps:
 
   - type: "sleep"
     seconds: 0.5
-    description: "Pause briefly before submitting"   
-  
+    description: "Pause briefly before submitting"
+
   - *submit_enter
 
   - type: "press_key_if_text_present"
