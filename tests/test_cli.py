@@ -1,13 +1,16 @@
-import sys
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from robot_py.cli import main
 
 def test_cli_missing_args():
     with patch("sys.argv", ["cli.py"]), \
          patch("sys.exit") as mock_exit, \
          patch("builtins.print") as mock_print:
-        main()
+        mock_exit.side_effect = SystemExit(1)
+        with pytest.raises(SystemExit) as e:
+            main()
+        
+        assert e.value.code == 1
         mock_exit.assert_called_with(1)
         mock_print.assert_called_with("Usage: python3 -m robot_py.cli <path_to_yaml>")
 
@@ -32,5 +35,9 @@ def test_cli_error_handling(tmp_path, monkeypatch):
 
     with patch("sys.argv", ["cli.py", "non_existent.yaml"]), \
          patch("sys.exit") as mock_exit:
-        main()
+        mock_exit.side_effect = SystemExit(1)
+        with pytest.raises(SystemExit) as e:
+            main()
+        
+        assert e.value.code == 1
         mock_exit.assert_called_with(1)
