@@ -1,6 +1,5 @@
-import sys
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from robot_py.cli import main
 
 def test_cli_missing_args():
