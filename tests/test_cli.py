@@ -1,5 +1,6 @@
+import sys
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from robot_py.cli import main
 
 def test_cli_missing_args():
@@ -41,3 +42,4 @@ def test_cli_error_handling(tmp_path, monkeypatch):
         
         assert e.value.code == 1
         mock_exit.assert_called_with(1)
+
