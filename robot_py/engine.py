@@ -101,8 +101,9 @@ def validate_environment():
             missing_vars.append("TN5250_HOST")
 
     if missing_vars:
+        mode = "HMC Proxy" if hmc_host else "Direct IP"
         raise ValueError(
-            f"Missing required environment variables: {', '.join(missing_vars)}"
+            f"Missing required environment variables for {mode} connection: {', '.join(missing_vars)}"
         )
 
     # Validate device type if it's set
