@@ -33,17 +33,20 @@ The machine running the robot must have the required software installed. This in
 #### For Debian/Ubuntu-based systems:
 
 1.  **Install Build Dependencies and Core Tools**:
+
     ```bash
     sudo apt update
     sudo apt install -y git build-essential automake autoconf libncurses-dev pkg-config tmux python3 python3-pip
     ```
 
 2.  **Install Python Dependencies**:
+
     ```bash
     pip install -r requirements.txt
     ```
 
 3.  **Build and Install `tn5250` from Source**:
+
     ```bash
     # Clone the official repository
     git clone https://github.com/tn5250j/tn5250.git
@@ -69,6 +72,7 @@ The robot loads its configuration from environment files that are specific to th
 2.  **Add Configuration Variables**:
 
     **Example for `.env.pub400.com`:**
+
     ```env
     # Credentials for the target system
     TN5250_USER="YOUR_USERNAME"
@@ -91,6 +95,7 @@ The robot loads its configuration from environment files that are specific to th
 Create a YAML file. The engine uses a structured format where steps are defined within a `steps` array.
 
 **`my_automation.yaml`:**
+
 ```yaml
 name: "Log in and Navigate"
 description: "A sample script to log in and capture the main menu"
@@ -141,16 +146,18 @@ chmod +x run-robot.sh
 ```
 
 #### Debug Mode
+
 To see detailed logs and automatic screen captures for every step:
+
 ```bash
 LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
 ```
+
 Debug captures are stored in `logs/captures/<host>/`.
 
 ## 📁 Project Structure
 
 - `robot_py/`: The core RPA engine logic (Python).
-- `ts_backup/`: Original TypeScript and React code (Archived).
 - `run-robot.sh`: The main entry point shell script.
 - `example_script.yaml`: A sample automation workflow.
 - `captures/`: Directory containing host-specific screen captures.
