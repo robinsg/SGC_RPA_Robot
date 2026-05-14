@@ -1,0 +1,21 @@
+name: "Example Include Script"
+description: "Demonstrates how to use modular login steps via !include"
+tmux_session: "robot-example"
+
+steps:
+  # Load the common login steps for direct connection
+  - !include common/direct_login.yaml
+
+  - type: "wait_for_text"
+    text: "IBM i Main Menu"
+    description: "Ensure we reached the main menu after login"
+
+  - type: "capture"
+    filename: "main_menu_after_include"
+
+  - type: "send_text"
+    text: "signoff"
+    description: "Sign off from the session"
+
+  - type: "send_key"
+    key: "Enter"
