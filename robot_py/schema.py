@@ -130,134 +130,21 @@ class RobotScript:
     defaults: RobotDefaults = field(default_factory=RobotDefaults)
 
 
-class RobotLoader(yaml.SafeLoader):
-    """Custom YAML loader to support !include tags and track file root."""
-
-    def __init__(self, stream: Any) -> None:
-        """Initialises the loader and determines the root directory.
-
-        Args:
-            stream: The input stream.
-        """
-        self._root = os.path.split(stream.name)[0] if hasattr(stream, "name") else "."
-        super().__init__(stream)
-
-    @property
-    def root(self) -> str:
-        """Returns the root directory of the file being parsed."""
-        return self._root
-
-
-def include_constructor(loader: RobotLoader, node: yaml.Node) -> Any:
-    """Constructor for the !include tag.
-
-    Args:
-        loader: The RobotLoader instance.
-        node: The YAML node.
-
-    Returns:
-        The content of the included file.
-    """
-    filename = loader.construct_scalar(node)
-    filepath = os.path.join(loader.root, filename)
-    return load_robot_yaml_data(filepath)
-
-
-yaml.add_constructor("!include", include_constructor, Loader=RobotLoader)
-
-
-def load_robot_yaml_data(filepath: str) -> Any:
-    """Loads robot YAML data with environment substitution and inheritance.
-
-    Args:
-        filepath: Path to the YAML file.
-
-    Returns:
-        The processed YAML data.
-    """
-    with open(filepath, "r") as f:
+def parse_robot_script(yaml_path: str) -> RobotScript:
+    with open(yaml_path, "r") as f:
         content = f.read()
 
-    processed_content = substitute_env_vars(content)
-
-    # Use a StringIO to simulate a file with a .name attribute for RobotLoader
-    from io import StringIO
-
-    stream = StringIO(processed_content)
-    stream.name = filepath
-
-    data = yaml.load(stream, Loader=RobotLoader)
-
-    if isinstance(data, dict) and "include" in data:
-        base_path = os.path.join(os.path.dirname(filepath), data["include"])
-        base_data = load_robot_yaml_data(base_path)
-
-        # Merge base_data into data
-        if isinstance(base_data, dict):
-            merged = base_data.copy()
-            for key, value in data.items():
-                if key == "include":
-                    continue
-                if key == "defaults" and isinstance(value, dict) and "defaults" in merged:
-                    merged["defaults"] = {**merged["defaults"], **value}
-                else:
-                    merged[key] = value
-            return merged
-
-    return data
-
-
-def substitute_env_vars(content: str) -> str:
-    """Substitutes environment variables in a string.
-
-    Args:
-        content: The string to process.
-
-    Returns:
-        The string with environment variables substituted.
-    """
-
+    # Process environment variables: ${VAR_NAME} or ${VAR_NAME:-default}
     def replace_env(match):
         var_name = match.group(1)
         default_val = match.group(2) if match.group(2) else ""
         return os.environ.get(var_name, default_val)
 
-    return re.sub(r"\${(\w+)(?::-(.*?))?}", replace_env, content)
+    processed_content = re.sub(r"\${(\w+)(?::-(.*?))?}", replace_env, content)
 
+    data = yaml.safe_load(processed_content)
 
-def _flatten_steps(steps: List[Any]) -> List[Dict[str, Any]]:
-    """Recursively flattens a list of steps.
-
-    Args:
-        steps: The list of steps to flatten.
-
-    Returns:
-        A flattened list of step dictionaries.
-    """
-    flattened = []
-    for step in steps:
-        if isinstance(step, list):
-            flattened.extend(_flatten_steps(step))
-        else:
-            flattened.append(step)
-    return flattened
-
-
-def parse_robot_script(yaml_path: str) -> RobotScript:
-    """Parses a robot YAML script into a RobotScript object.
-
-    Args:
-        yaml_path: Path to the YAML file.
-
-    Returns:
-        The parsed RobotScript object.
-    """
-    data = load_robot_yaml_data(yaml_path)
-
-    raw_steps = data.get("steps", [])
-    flattened_steps = _flatten_steps(raw_steps)
-
-    steps = [Action.from_dict(step) for step in flattened_steps]
+    steps = [Action.from_dict(step) for step in data.get("steps", [])]
 
     defaults_data = data.get("defaults", {})
     defaults = RobotDefaults(
