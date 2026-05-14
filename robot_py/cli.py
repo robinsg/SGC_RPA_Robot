@@ -5,6 +5,14 @@ from .logger import logger
 
 
 def main():
+    """Main entry point for the robot_py CLI.
+
+    Parses command-line arguments, initialises the RobotEngine with the
+    provided YAML script, and starts the automation.
+
+    Raises:
+        SystemExit: If no script path is provided or an error occurs.
+    """
     if len(sys.argv) < 2:
         print("Usage: python3 -m robot_py.cli <path_to_yaml>")
         sys.exit(1)
