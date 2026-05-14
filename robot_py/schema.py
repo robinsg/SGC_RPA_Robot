@@ -253,11 +253,132 @@ class RobotScript:
     defaults: RobotDefaults = field(default_factory=RobotDefaults)
 
 
-def parse_robot_script(yaml_path: str) -> RobotScript:
-    """Load and parse a YAML automation script.
+class RobotLoader(yaml.SafeLoader):
+    """Custom YAML loader that supports the !include tag.
 
-    Environment variables in the YAML file (e.g., ${VAR_NAME} or
-    ${VAR_NAME:-default}) are substituted during parsing.
+    Attributes:
+        _root: The directory containing the YAML file being parsed.
+    """
+
+    def __init__(self, stream: Any):
+        """Initialize the loader and set the root directory.
+
+        Args:
+            stream: The input stream (file object).
+        """
+        self._root = os.path.dirname(os.path.abspath(stream.name))
+        super().__init__(stream)
+
+
+def _include_tag_constructor(loader: RobotLoader, node: yaml.nodes.ScalarNode) -> Any:
+    """Constructor for the !include tag.
+
+    Args:
+        loader: The RobotLoader instance.
+        node: The YAML node representing the include path.
+
+    Returns:
+        The parsed content of the included file.
+    """
+    filename = loader.construct_scalar(node)
+    filepath = os.path.join(loader._root, filename)
+    with open(filepath, "r") as f:
+        return yaml.load(f, RobotLoader)
+
+
+yaml.add_constructor("!include", _include_tag_constructor, RobotLoader)
+
+
+def _substitute_env_vars(data: Any) -> Any:
+    """Recursively substitute environment variables in strings.
+
+    Supports ${VAR_NAME} or ${VAR_NAME:-default}.
+
+    Args:
+        data: The data structure to process.
+
+    Returns:
+        The data structure with environment variables substituted.
+    """
+    if isinstance(data, dict):
+        return {k: _substitute_env_vars(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_substitute_env_vars(item) for item in data]
+    elif isinstance(data, str):
+
+        def replace_env(match):
+            var_name = match.group(1)
+            default_val = match.group(2) if match.group(2) else ""
+            return os.environ.get(var_name, default_val)
+
+        return re.sub(r"\${(\w+)(?::-(.*?))?}", replace_env, data)
+    return data
+
+
+def _flatten_steps(steps: List[Any]) -> List[Dict[str, Any]]:
+    """Recursively flatten a list of steps.
+
+    If an include returns a list of actions, they are flattened into the main sequence.
+
+    Args:
+        steps: The list of steps to flatten.
+
+    Returns:
+        A flattened list of step dictionaries.
+    """
+    flat_steps = []
+    for step in steps:
+        if isinstance(step, list):
+            flat_steps.extend(_flatten_steps(step))
+        elif isinstance(step, dict):
+            flat_steps.append(step)
+    return flat_steps
+
+
+def _load_yaml_with_inheritance(yaml_path: str) -> Dict[str, Any]:
+    """Load a YAML file and handle the top-level 'include' key for inheritance.
+
+    Args:
+        yaml_path: Path to the YAML file.
+
+    Returns:
+        A dictionary containing the merged YAML data.
+    """
+    with open(yaml_path, "r") as f:
+        data = yaml.load(f, RobotLoader)
+
+    if not isinstance(data, dict):
+        return data
+
+    if "include" in data:
+        include_path = data.pop("include")
+        if not os.path.isabs(include_path):
+            include_path = os.path.join(
+                os.path.dirname(os.path.abspath(yaml_path)), include_path
+            )
+
+        parent_data = _load_yaml_with_inheritance(include_path)
+
+        # Merge logic
+        merged = parent_data.copy()
+        for key, value in data.items():
+            if key == "steps":
+                merged["steps"] = parent_data.get("steps", []) + value
+            elif (
+                key == "defaults"
+                and isinstance(value, dict)
+                and isinstance(merged.get("defaults"), dict)
+            ):
+                merged["defaults"].update(value)
+            else:
+                merged[key] = value
+        return merged
+
+    return data
+
+
+def parse_robot_script(yaml_path: str) -> RobotScript:
+    """Load and parse a YAML automation script with includes and inheritance.
 
     Args:
         yaml_path: Path to the YAML script file.
@@ -269,20 +390,12 @@ def parse_robot_script(yaml_path: str) -> RobotScript:
         FileNotFoundError: If the YAML file does not exist.
         yaml.YAMLError: If the YAML content is invalid.
     """
-    with open(yaml_path, "r") as f:
-        content = f.read()
+    raw_data = _load_yaml_with_inheritance(yaml_path)
+    data = _substitute_env_vars(raw_data)
 
-    # Process environment variables: ${VAR_NAME} or ${VAR_NAME:-default}
-    def replace_env(match):
-        var_name = match.group(1)
-        default_val = match.group(2) if match.group(2) else ""
-        return os.environ.get(var_name, default_val)
-
-    processed_content = re.sub(r"\${(\w+)(?::-(.*?))?}", replace_env, content)
-
-    data = yaml.safe_load(processed_content)
-
-    steps = [Action.from_dict(step) for step in data.get("steps", [])]
+    raw_steps = data.get("steps", [])
+    flattened_steps = _flatten_steps(raw_steps)
+    steps = [Action.from_dict(step) for step in flattened_steps]
 
     defaults_data = data.get("defaults", {})
     defaults = RobotDefaults(
