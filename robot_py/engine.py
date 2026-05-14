@@ -64,7 +64,7 @@ SUPPORTED_24x80 = [
 
 
 def validate_environment():
-    """Validates that required environment variables are set and non-empty.
+    """Validate that required environment variables are set and non-empty.
 
     Checks for required variables based on whether a direct IP connection
     or an HMC 5250 Proxy connection is being used. Also validates that
@@ -113,7 +113,30 @@ def validate_environment():
 
 
 class RobotEngine:
+    """The core engine responsible for executing automation scripts.
+
+    This class manages the interaction with a tmux session, sends keystrokes,
+    and captures/analyzes the terminal screen.
+
+    Attributes:
+        script: The parsed RobotScript object.
+        session: The name of the tmux session.
+        host: The target host for the 5250 connection.
+        log_level: The current logging level.
+        last_logged_title: The title of the last captured screen.
+        max_rows: Maximum rows for the terminal device type.
+        max_cols: Maximum columns for the terminal device type.
+    """
+
     def __init__(self, yaml_path: str):
+        """Initialize the RobotEngine.
+
+        Args:
+            yaml_path: Path to the YAML script file.
+
+        Raises:
+            ValueError: If the environment is invalid or the device type is unsupported.
+        """
         validate_environment()
         self.script = parse_robot_script(yaml_path)
         self.session = os.environ.get("TMUX_SESSION", self.script.tmux_session)
@@ -132,6 +155,17 @@ class RobotEngine:
             raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
 
     def run_tmux(self, args: List[str]) -> str:
+        """Execute a tmux command and return its output.
+
+        Args:
+            args: List of arguments for the tmux command.
+
+        Returns:
+            The standard output of the tmux command.
+
+        Raises:
+            RuntimeError: If the tmux session does not exist or the command fails.
+        """
         # Always check if the tmux session exists before attempting any command.
         if not self.check_session_exists():
             raise RuntimeError(f"Tmux session '{self.session}' not found.")
@@ -148,13 +182,18 @@ class RobotEngine:
         return result.stdout
 
     def check_session_exists(self) -> bool:
+        """Check if the configured tmux session exists.
+
+        Returns:
+            True if the session exists, False otherwise.
+        """
         result = subprocess.run(
             ["tmux", "has-session", "-t", self.session], capture_output=True
         )
         return result.returncode == 0
 
     def terminate_session(self):
-        """Kills the tmux session associated with this robot."""
+        """Kill the tmux session associated with this robot."""
         if self.check_session_exists():
             logger.info(f"Terminating tmux session: {self.session}")
             subprocess.run(
@@ -164,18 +203,43 @@ class RobotEngine:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
 
     def validate_coords(self, row: int, col: int):
+        """Validate that the given coordinates are within terminal bounds.
+
+        Args:
+            row: The row number (1-indexed).
+            col: The column number (1-indexed).
+
+        Raises:
+            ValueError: If the coordinates are out of bounds.
+        """
         if not (1 <= row <= self.max_rows):
             raise ValueError(f"Row {row} out of bounds (1-{self.max_rows})")
         if not (1 <= col <= self.max_cols):
             raise ValueError(f"Column {col} out of bounds (1-{self.max_cols})")
 
     def validate_block(self, row: int, col: int, end_row: int, end_col: int):
+        """Validate that the given block coordinates are valid and within bounds.
+
+        Args:
+            row: Starting row (1-indexed).
+            col: Starting column (1-indexed).
+            end_row: Ending row (1-indexed).
+            end_col: Ending column (1-indexed).
+
+        Raises:
+            ValueError: If any coordinate is out of bounds or the block is invalid.
+        """
         self.validate_coords(row, col)
         self.validate_coords(end_row, end_col)
         if row > end_row or col > end_col:
             raise ValueError(f"Invalid block: ({row},{col}) to ({end_row},{end_col})")
 
     def get_cursor_position(self) -> Tuple[int, int]:
+        """Get the current cursor position in the tmux pane.
+
+        Returns:
+            A tuple of (row, col), both 1-indexed.
+        """
         # tmux uses 0-indexed coords, robot uses 1-indexed
         res = self.run_tmux(
             ["display-message", "-p", "-t", self.session, "#{cursor_y},#{cursor_x}"]
@@ -184,6 +248,12 @@ class RobotEngine:
         return y + 1, x + 1
 
     def move_cursor(self, target_row: int, target_col: int):
+        """Move the cursor to the specified coordinates using arrow keys.
+
+        Args:
+            target_row: Target row (1-indexed).
+            target_col: Target column (1-indexed).
+        """
         self.validate_coords(target_row, target_col)
         curr_row, curr_col = self.get_cursor_position()
 
@@ -205,6 +275,13 @@ class RobotEngine:
                 self.run_tmux(["send-keys", "-t", self.session, "Left"])
 
     def capture_pane(self) -> str:
+        """Capture the current content of the tmux pane.
+
+        Also detects and logs screen title changes based on the first few lines.
+
+        Returns:
+            The raw text content of the pane.
+        """
         pane_content = self.run_tmux(["capture-pane", "-t", self.session, "-p"])
 
         lines = pane_content.splitlines()
@@ -228,12 +305,26 @@ class RobotEngine:
         self,
         pane_content: str,
         text: str,
-        row=None,
-        col=None,
-        end_row=None,
-        end_col=None,
-        is_message_line=None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        end_row: Optional[int] = None,
+        end_col: Optional[int] = None,
+        is_message_line: Optional[bool] = None,
     ) -> bool:
+        """Search for text within a specific area of the pane content.
+
+        Args:
+            pane_content: The raw text content of the pane.
+            text: The string to search for.
+            row: Starting row (1-indexed).
+            col: Starting column (1-indexed).
+            end_row: Ending row (1-indexed).
+            end_col: Ending column (1-indexed).
+            is_message_line: If True, search only the message line.
+
+        Returns:
+            True if the text was found, False otherwise.
+        """
         lines = pane_content.splitlines()
 
         if is_message_line:
@@ -272,6 +363,19 @@ class RobotEngine:
         end_row: int,
         end_col: int,
     ) -> Optional[int]:
+        """Find the row number of a text string within a specified block.
+
+        Args:
+            pane_content: The raw text content of the pane.
+            text: The string to search for.
+            row: Starting row (1-indexed).
+            col: Starting column (1-indexed).
+            end_row: Ending row (1-indexed).
+            end_col: Ending column (1-indexed).
+
+        Returns:
+            The 1-indexed row number if found, None otherwise.
+        """
         self.validate_block(row, col, end_row, end_col)
         lines = pane_content.splitlines()
         for i in range(row - 1, end_row):
@@ -286,12 +390,26 @@ class RobotEngine:
         self,
         text: str,
         timeout: int,
-        row=None,
-        col=None,
-        end_row=None,
-        end_col=None,
-        is_message_line=None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        end_row: Optional[int] = None,
+        end_col: Optional[int] = None,
+        is_message_line: Optional[bool] = None,
     ) -> Tuple[bool, str]:
+        """Wait for text to appear, returning success status and last content.
+
+        Args:
+            text: The string to wait for.
+            timeout: Maximum wait time in seconds.
+            row: Starting row (1-indexed).
+            col: Starting column (1-indexed).
+            end_row: Ending row (1-indexed).
+            end_col: Ending column (1-indexed).
+            is_message_line: If True, search only the message line.
+
+        Returns:
+            A tuple of (found, last_pane_content).
+        """
         start_time = time.time()
         expiry = start_time + timeout
         last_content = ""
@@ -310,12 +428,26 @@ class RobotEngine:
         self,
         text: str,
         timeout: int,
-        row=None,
-        col=None,
-        end_row=None,
-        end_col=None,
-        is_message_line=None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        end_row: Optional[int] = None,
+        end_col: Optional[int] = None,
+        is_message_line: Optional[bool] = None,
     ):
+        """Wait for text to appear, raising an error if it doesn't within the timeout.
+
+        Args:
+            text: The string to wait for.
+            timeout: Maximum wait time in seconds.
+            row: Starting row (1-indexed).
+            col: Starting column (1-indexed).
+            end_row: Ending row (1-indexed).
+            end_col: Ending column (1-indexed).
+            is_message_line: If True, search only the message line.
+
+        Raises:
+            RuntimeError: If the text is not found within the timeout.
+        """
         found, last_content = self.wait_for_text_internal(
             text, timeout, row, col, end_row, end_col, is_message_line
         )
@@ -326,6 +458,13 @@ class RobotEngine:
         raise RuntimeError(error_msg)
 
     def capture_debug_screen(self, action_name: str):
+        """Capture the screen content for debugging purposes.
+
+        Only captures if the log level is set to DEBUG.
+
+        Args:
+            action_name: A name for the capture, used in the filename.
+        """
         if self.log_level != "DEBUG":
             return
         try:
@@ -346,6 +485,11 @@ class RobotEngine:
             logger.warning(f"[Debug Capture] Failed to capture screen: {str(e)}")
 
     def run(self):
+        """Execute all steps defined in the robot script.
+
+        Iterates through the steps in self.script.steps and performs
+        the corresponding actions.
+        """
         logger.info(f"Starting Robot: {self.script.name}")
         if self.script.description:
             logger.info(f"Description: {self.script.description}")
