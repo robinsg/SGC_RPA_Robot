@@ -105,6 +105,7 @@ TN5250_PASSWORD="MY_PASSWORD"
 Create a YAML file defining your steps.
 
 **`my_automation.yaml`:**
+
 ```yaml
 name: "Log in and Navigate"
 description: "A sample script to log in and capture the main menu"
@@ -171,10 +172,13 @@ Execute the robot using the `run-robot.sh` script, providing the YAML file and t
 ```
 
 #### Debug Mode
+
 To see detailed logs and automatic screen captures for every step:
+
 ```bash
 LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
 ```
+
 Debug captures are stored in `logs/captures/<host>/`.
 
 ## 📁 Project Structure
