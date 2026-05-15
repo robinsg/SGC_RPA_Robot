@@ -120,7 +120,11 @@ steps:
     text: "${TN5250_USER}" # Injects variable from .env file
 
   - type: "send_key"
+<<<<<<< HEAD
     key: "Tab"
+=======
+    key: "Tab
+>>>>>>> a3fb4c4 (Fix type in README.md)
 
   - type: "wait_for_text"
     text: "Password"
@@ -147,18 +151,18 @@ steps:
 
 ### Supported Actions
 
-| Action | Description | Key Parameters |
-| :--- | :--- | :--- |
-| `wait_for_text` | Waits for text to appear. Supports coordinates and block searches. | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `timeout_seconds` |
-| `send_text` | Sends a string of text to the terminal. | `text` |
-| `send_key` | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`). | `key` |
-| `sleep` | Pauses execution for a specified number of seconds. | `seconds` |
-| `capture` | Saves a screen capture to the `captures/` directory. | `filename` |
-| `press_key_if_text_present` | Sends a key only if the specified text is found on screen. | `text`, `key`, `timeout_seconds` |
-| `move_cursor` | Moves the terminal cursor to the specified coordinates. | `row`, `col` |
-| `search_and_move_cursor` | Finds text in a block and moves the cursor to a target column on the same row. | `text`, `row`, `col`, `end_row`, `end_col`, `target_col` |
-| `search_extract_and_send` | Finds text in a block, extracts data from the same row, and sends it. | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length` |
-| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it. | `length` |
+| Action                       | Description                                                                            | Key Parameters                                                                   |
+| :--------------------------- | :------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- |
+| `wait_for_text`              | Waits for text to appear. Supports coordinates and block searches.                     | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `timeout_seconds` |
+| `send_text`                  | Sends a string of text to the terminal.                                                | `text`                                                                           |
+| `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`). | `key`                                                                            |
+| `sleep`                      | Pauses execution for a specified number of seconds.                                    | `seconds`                                                                        |
+| `capture`                    | Saves a screen capture to the `captures/` directory.                                   | `filename`                                                                       |
+| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                             | `text`, `key`, `timeout_seconds`                                                 |
+| `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                | `row`, `col`                                                                     |
+| `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
+| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
+| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                           | `length`                                                                         |
 
 **Coordinates**: 5250 coordinates are 1-indexed. Rows are 1-24 (80 col) or 1-27 (132 col).
 **Message Line**: Setting `is_message_line: true` in wait actions automatically targets the status line (line 24 or 27).
