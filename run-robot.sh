@@ -9,15 +9,30 @@ mkdir -p "$DEBUG_CAPTURE_DIR"
 export LOG_DIR
 
 # --- Argument Processing ---
-# YAML file is the first argument, LPAR name is the second.
-if [ -z "$1" ] || [ -z "$2" ]; then
+START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+JSON_MODE=false
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --json)
+      JSON_MODE=true
+      shift
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [ ${#ARGS[@]} -lt 2 ]; then
   echo "Error: Both YAML file and LPAR name are required."
-  echo "Usage: $0 <path_to_yaml_script> <LPAR_NAME>"
+  echo "Usage: $0 [--json] <path_to_yaml_script> <LPAR_NAME>"
   exit 1
 fi
 
-YAML_FILE="$1"
-LPAR_NAME="$2"
+YAML_FILE="${ARGS[0]}"
+LPAR_NAME="${ARGS[1]}"
 
 # Verify YAML file exists
 if [ ! -f "$YAML_FILE" ]; then
@@ -28,19 +43,54 @@ fi
 LPAR_NAME_LOWER=$(echo "$LPAR_NAME" | tr '[:upper:]' '[:lower:]')
 
 # --- Unified Logging Function ---
-# Logs a message to both stdout and the appropriate log file.
+# Logs a message to the appropriate log file.
+# If JSON_MODE is false, also prints to stdout.
 log_message() {
     local message="$1"
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
-    local log_file="${LOG_DIR}/${LPAR_NAME_LOWER}.log"
+    local log_file="${LOG_DIR}/${LPAR_NAME_LOWER:-unknown}.log"
     
     # Append the formatted message to the log file
-    echo "${timestamp},${LPAR_NAME_LOWER},BASH: ${message}" >> "$log_file"
-    
-    # Also print the original message to the console
-    echo "${message}"
+    echo "${timestamp},${LPAR_NAME_LOWER:-unknown},BASH: ${message}" >> "$log_file"
+
+    # Also print the original message to the console if not in JSON mode
+    if [ "$JSON_MODE" = false ]; then
+        echo "${message}"
+    fi
 }
+
+# --- Error Handling for JSON Mode ---
+# Ensures that even on early exit, a JSON response is sent if requested.
+cleanup_and_exit() {
+    EXIT_CODE=$?
+    END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    if [ "$JSON_MODE" = true ]; then
+        STATUS="success"
+        [ "$EXIT_CODE" -ne 0 ] && STATUS="failure"
+
+        LOG_FILE_ABS=$(realpath "${LOG_DIR}/${LPAR_NAME_LOWER:-unknown}.log" 2>/dev/null || echo "${LOG_DIR}/${LPAR_NAME_LOWER:-unknown}.log")
+
+        # Generate JSON output to stdout
+        cat <<EOF
+{
+  "status": "$STATUS",
+  "exit_code": $EXIT_CODE,
+  "start_time": "${START_TIME:-$END_TIME}",
+  "end_time": "$END_TIME",
+  "log_file": "$LOG_FILE_ABS",
+  "host": "${LPAR_NAME_LOWER:-unknown}",
+  "yaml_script": "${YAML_FILE:-unknown}"
+}
+EOF
+    fi
+    exit "$EXIT_CODE"
+}
+
+if [ "$JSON_MODE" = true ]; then
+    trap cleanup_and_exit EXIT
+fi
 
 
 # --- Configuration Loading ---
@@ -164,6 +214,9 @@ export TMUX_SESSION
 
 # Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
 set +e
+if [ "$JSON_MODE" = true ]; then
+    export ROBOT_LOG_TO_STDOUT="false"
+fi
 log_message "--- Starting RPA Automation (Python) ---"
 if [ -z "${PYTHONPATH:-}" ]; then
     export PYTHONPATH="."
@@ -187,6 +240,10 @@ if [ "$SESSION_CREATED_BY_SCRIPT" = true ]; then
     else
         log_message "Session '$TMUX_SESSION' already terminated."
     fi
+fi
+
+if [ "$JSON_MODE" = true ]; then
+    exit "$EXIT_CODE"
 fi
 
 exit "$EXIT_CODE"
