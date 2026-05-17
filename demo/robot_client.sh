@@ -19,6 +19,7 @@ fi
 # 1. Invoke the robot via SSH with the --json flag
 # We capture the output to a variable.
 echo "Invoking robot for $LPAR_NAME..."
+# shellcheck disable=SC2029
 RESPONSE=$(ssh "${ROBOT_USER}@${ROBOT_SERVER}" "${ROBOT_PATH}/run-robot.sh --json $YAML_SCRIPT $LPAR_NAME")
 EXIT_CODE=$?
 

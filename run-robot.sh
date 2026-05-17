@@ -62,6 +62,7 @@ log_message() {
 
 # --- Error Handling for JSON Mode ---
 # Ensures that even on early exit, a JSON response is sent if requested.
+# shellcheck disable=SC2329
 cleanup_and_exit() {
     EXIT_CODE=$?
     END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
