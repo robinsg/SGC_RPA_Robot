@@ -66,12 +66,22 @@ log_message() {
 cleanup_and_exit() {
     EXIT_CODE=$?
     END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-    
+
     if [ "$JSON_MODE" = true ]; then
         STATUS="success"
         [ "$EXIT_CODE" -ne 0 ] && STATUS="failure"
 
         LOG_FILE_ABS=$(realpath "${LOG_DIR}/${LPAR_NAME_LOWER:-unknown}.log" 2>/dev/null || echo "${LOG_DIR}/${LPAR_NAME_LOWER:-unknown}.log")
+
+        # Extract the last screen title from the log if it exists
+        LAST_SCREEN=""
+        if [ -f "$LOG_FILE_ABS" ]; then
+            # Look for lines containing "[Screen]" and take the last one.
+            # We use sed to extract everything after "[Screen] " and then
+            # we need to escape double quotes for the JSON.
+            LAST_SCREEN_RAW=$(grep "\[Screen\]" "$LOG_FILE_ABS" | tail -n 1 | sed 's/.*\[Screen\] //')
+            LAST_SCREEN=$(echo "$LAST_SCREEN_RAW" | sed 's/"/\\"/g')
+        fi
 
         # Generate JSON output to stdout
         cat <<EOF
@@ -81,6 +91,7 @@ cleanup_and_exit() {
   "start_time": "${START_TIME:-$END_TIME}",
   "end_time": "$END_TIME",
   "log_file": "$LOG_FILE_ABS",
+  "last_screen": "$LAST_SCREEN",
   "host": "${LPAR_NAME_LOWER:-unknown}",
   "yaml_script": "${YAML_FILE:-unknown}"
 }
