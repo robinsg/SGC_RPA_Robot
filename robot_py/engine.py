@@ -278,11 +278,15 @@ class RobotEngine:
         """Capture the current content of the tmux pane.
 
         Also detects and logs screen title changes based on the first few lines.
+        Ensures that only the expected number of rows (based on device type)
+        are captured, even if the tmux pane is larger.
 
         Returns:
             The raw text content of the pane.
         """
-        pane_content = self.run_tmux(["capture-pane", "-t", self.session, "-p"])
+        pane_content = self.run_tmux(
+            ["capture-pane", "-t", self.session, "-p", "-S", "0", "-E", str(self.max_rows - 1)]
+        )
 
         lines = pane_content.splitlines()
         new_title = ""
