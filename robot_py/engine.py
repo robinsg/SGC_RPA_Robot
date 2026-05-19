@@ -285,7 +285,16 @@ class RobotEngine:
             The raw text content of the pane.
         """
         pane_content = self.run_tmux(
-            ["capture-pane", "-t", self.session, "-p", "-S", "0", "-E", str(self.max_rows - 1)]
+            [
+                "capture-pane",
+                "-t",
+                self.session,
+                "-p",
+                "-S",
+                "0",
+                "-E",
+                str(self.max_rows - 1),
+            ]
         )
 
         lines = pane_content.splitlines()
