@@ -95,7 +95,7 @@ HMC_USER="hmc_admin"
 HMC_PWD="hmc_password"
 HMC_SYSNAME="MY_POWER_SYSTEM"
 HMC_LPARNAME="MY_LPAR"
-HMC_SESSION_KEY="session1" # Optional
+HMC_SESSION_KEY="session1" # Required for HMC connections
 TN5250_USER="MY_USER"
 TN5250_PASSWORD="MY_PASSWORD"
 ```
@@ -154,7 +154,7 @@ steps:
 | `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`). | `key`                                                                            |
 | `sleep`                      | Pauses execution for a specified number of seconds.                                    | `seconds`                                                                        |
 | `capture`                    | Saves a screen capture to the `captures/` directory.                                   | `filename`                                                                       |
-| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                             | `text`, `key`, `timeout_seconds`                                                 |
+| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                             | `text`, `key`, `timeout_seconds`, `wait_ms`                                      |
 | `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                | `row`, `col`                                                                     |
 | `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
 | `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
@@ -173,7 +173,7 @@ Execute the robot using the `run-robot.sh` script, providing the YAML file and t
 
 #### Debug Mode
 
-To see detailed logs and automatic screen captures for every step:
+To see detailed logs and automatic screen captures for every step, set the `LOG_LEVEL` environment variable to `debug`. Note that the LPAR name provided as the second argument becomes the `TN5250_HOST` used for folder pathing.
 
 ```bash
 LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
