@@ -120,11 +120,7 @@ steps:
     text: "${TN5250_USER}" # Injects variable from .env file
 
   - type: "send_key"
-<<<<<<< HEAD
     key: "Tab"
-=======
-    key: "Tab
->>>>>>> a3fb4c4 (Fix type in README.md)
 
   - type: "wait_for_text"
     text: "Password"
