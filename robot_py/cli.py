@@ -19,7 +19,13 @@ def main():
 
     yaml_arg = sys.argv[1]
     try:
-        yaml_path = os.path.abspath(yaml_arg)
+        if os.path.isfile(yaml_arg):
+            yaml_path = os.path.abspath(yaml_arg)
+        elif os.path.isfile(os.path.join("yaml_scripts", yaml_arg)):
+            yaml_path = os.path.abspath(os.path.join("yaml_scripts", yaml_arg))
+        else:
+            yaml_path = os.path.abspath(yaml_arg)  # Fallback to absolute path for error reporting
+
         engine = RobotEngine(yaml_path)
         engine.run()
     except Exception as e:

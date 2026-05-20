@@ -16,12 +16,18 @@ if [ -z "$1" ] || [ -z "$2" ]; then
   exit 1
 fi
 
-YAML_FILE="$1"
+YAML_FILE_ARG="$1"
 LPAR_NAME="$2"
 
-# Verify YAML file exists
-if [ ! -f "$YAML_FILE" ]; then
-  echo "Error: YAML file '$YAML_FILE' not found."
+# Search for the YAML file:
+# 1. At the provided path
+# 2. In the yaml_scripts directory
+if [ -f "$YAML_FILE_ARG" ]; then
+  YAML_FILE="$YAML_FILE_ARG"
+elif [ -f "yaml_scripts/$YAML_FILE_ARG" ]; then
+  YAML_FILE="yaml_scripts/$YAML_FILE_ARG"
+else
+  echo "Error: YAML file '$YAML_FILE_ARG' not found (checked current directory and yaml_scripts/)."
   exit 1
 fi
 

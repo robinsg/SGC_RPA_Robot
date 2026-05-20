@@ -102,9 +102,9 @@ TN5250_PASSWORD="MY_PASSWORD"
 
 ### Step 3: Define the Automation Workflow
 
-Create a YAML file defining your steps.
+Create a YAML file defining your steps. All automation scripts should be stored in the `yaml_scripts/` directory.
 
-**`my_automation.yaml`:**
+**`yaml_scripts/my_automation.yaml`:**
 
 ```yaml
 name: "Log in and Navigate"
@@ -189,7 +189,7 @@ Debug captures are stored in `logs/captures/<host>/`.
 
 - `robot_py/`: The core RPA engine logic (Python 3.12+).
 - `run-robot.sh`: Main entry point. Handles environment loading, connectivity checks, and tmux session management.
-- `example_script.yaml`: A sample automation workflow.
+- `yaml_scripts/`: Directory containing all YAML automation scripts and common components.
 - `captures/`: Host-specific screen captures.
 - `logs/`: Application logs and debug captures.
 - `tests/`: Automated test suite for the engine and schema validation.

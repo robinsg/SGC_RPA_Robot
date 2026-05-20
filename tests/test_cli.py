@@ -14,6 +14,25 @@ def test_cli_missing_args():
         mock_exit.assert_called_with(1)
         mock_print.assert_called_with("Usage: python3 -m robot_py.cli <path_to_yaml>")
 
+def test_cli_search_in_yaml_scripts(tmp_path, monkeypatch):
+    # Change to a temporary directory to avoid picking up actual files
+    monkeypatch.chdir(tmp_path)
+
+    scripts_dir = tmp_path / "yaml_scripts"
+    scripts_dir.mkdir()
+    yaml_file = scripts_dir / "test_script.yaml"
+    yaml_file.write_text("name: Test\nsteps: []")
+
+    monkeypatch.setenv("TN5250_HOST", "test_host")
+    monkeypatch.setenv("TN5250_USER", "test_user")
+    monkeypatch.setenv("TN5250_PASSWORD", "test_password")
+
+    with patch("sys.argv", ["cli.py", "test_script.yaml"]), \
+         patch("robot_py.engine.RobotEngine.run") as mock_run, \
+         patch("robot_py.engine.RobotEngine.check_session_exists", return_value=True):
+        main()
+        mock_run.assert_called_once()
+
 def test_cli_success(tmp_path, monkeypatch):
     yaml_file = tmp_path / "test.yaml"
     yaml_file.write_text("name: Test\nsteps: []")
