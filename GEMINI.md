@@ -26,6 +26,7 @@ This project is an RPA (Robotic Process Automation) engine for IBM i (AS/400) sy
 - **Targeting:** Prefer rectangular block searches (`row`, `col`, `end_row`, `end_col`) over global searches when targeting specific fields to reduce false positives.
 - **Conditional Logic:** Use `press_key_if_text_present` for optional screens (e.g., Sign On Info, Password Expiry warnings) rather than hard branching.
 - **Mental Model:** Treat different screens as objects (Page Object Model). The YAML steps should represent a clear transition from one screen to the next.
+- **YAML Script files**: YAML script files to be located in `yaml_scripts/`.
 
 ## Python Engine Development
 
@@ -61,7 +62,6 @@ The repo structure is intentional. Do not reorganise it.
 - Moving Python code to a `src/` layout
 - Migrating from `requirements.txt` to Poetry
 - Refactoring `run-robot.sh` into a Python entry point
-- Adding complexity to `ts_backup/`
 
 ## Code Quality Standards
 

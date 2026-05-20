@@ -4,6 +4,7 @@
 
 - **Terminal Reliability**: Always prioritise robust screen state detection. Never assume a screen has loaded without a matching `wait_for_text` or similar guard.
 - **YAML First**: All automation logic must reside in YAML configuration. The Python engine must remain generic and driven by the schema.
+- **YAML Scripts**: All YAML scripts to be located in director yaml_scripts.
 - **Environment Isolation**: Screens vary by LPAR. Use `TN5250_HOST` to segment configuration and output (like captures).
 
 ## Technical Implementation Rules
@@ -24,7 +25,6 @@ The repo structure is intentional. **Never reorganise it.**
 
 - `robot_py/` — all Python source code. Do not move files out of here.
 - `run-robot.sh` — the main entry point shell script. Do not rename or replace it.
-- `ts_backup/` — archived TypeScript/React code. **Ignore this directory entirely. Do not lint, edit, or generate code here.**
 - `requirements.txt` — manages Python dependencies. Do not migrate to Poetry or any pyproject.toml-based dependency tool.
 
 **Never propose or implement:**
