@@ -9,19 +9,65 @@ mkdir -p "$DEBUG_CAPTURE_DIR"
 export LOG_DIR
 
 # --- Argument Processing ---
-# YAML file is the first argument, LPAR name is the second.
-if [ -z "$1" ] || [ -z "$2" ]; then
-  echo "Error: Both YAML file and LPAR name are required."
-  echo "Usage: $0 <path_to_yaml_script> <LPAR_NAME>"
-  exit 1
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -f, --yaml-file <path>    Path to the YAML automation script"
+    echo "  -h, --host <name>         LPAR host name (e.g., pub400.com)"
+    echo "  --help                    Show this help message and exit"
+    echo ""
+    echo "Example:"
+    echo "  $0 -f my_script.yaml -h pub400.com"
+}
+
+YAML_FILE=""
+LPAR_NAME=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -f|--yaml-file)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+                YAML_FILE="$2"
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                usage
+                exit 1
+            fi
+            ;;
+        -h|--host)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+                LPAR_NAME="$2"
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                usage
+                exit 1
+            fi
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown or positional argument: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# Verify required arguments
+if [[ -z "$YAML_FILE" ]] || [[ -z "$LPAR_NAME" ]]; then
+    echo "Error: Both --yaml-file and --host are required." >&2
+    usage
+    exit 1
 fi
 
-YAML_FILE="$1"
-LPAR_NAME="$2"
-
 # Verify YAML file exists
-if [ ! -f "$YAML_FILE" ]; then
-  echo "Error: YAML file '$YAML_FILE' not found."
+if [[ ! -f "$YAML_FILE" ]]; then
+  echo "Error: YAML file '$YAML_FILE' not found." >&2
   exit 1
 fi
 
@@ -170,7 +216,7 @@ if [ -z "${PYTHONPATH:-}" ]; then
 else
     export PYTHONPATH="${PYTHONPATH}:."
 fi
-python3 -m robot_py.cli "$YAML_FILE"
+python3 -m robot_py.cli --yaml-file "$YAML_FILE"
 EXIT_CODE=$?
 set -e # Re-enable exit on error
 

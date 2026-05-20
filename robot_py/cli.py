@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 from .engine import RobotEngine
 from .logger import logger
 
@@ -13,11 +14,14 @@ def main():
     Raises:
         SystemExit: If no script path is provided or an error occurs.
     """
-    if len(sys.argv) < 2:
-        print("Usage: python3 -m robot_py.cli <path_to_yaml>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="5250 RPA Robot Engine CLI")
+    parser.add_argument(
+        "-f", "--yaml-file", help="Path to the YAML automation script", required=True
+    )
 
-    yaml_arg = sys.argv[1]
+    args = parser.parse_args()
+    yaml_arg = args.yaml_file
+
     try:
         yaml_path = os.path.abspath(yaml_arg)
         engine = RobotEngine(yaml_path)
