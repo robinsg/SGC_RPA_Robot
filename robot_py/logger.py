@@ -75,9 +75,10 @@ def setup_logger() -> logging.Logger:
     logger.addHandler(file_handler)
 
     # Console handler with the readable format
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(CustomFormatter())
-    logger.addHandler(console_handler)
+    if os.environ.get("ROBOT_LOG_TO_STDOUT", "true").lower() == "true":
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(CustomFormatter())
+        logger.addHandler(console_handler)
 
     return logger
 

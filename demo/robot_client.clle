@@ -1,0 +1,22 @@
+PGM        PARM(&LPAR &SCRIPT)
+
+             DCL        VAR(&LPAR) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SCRIPT) TYPE(*CHAR) LEN(50)
+             DCL        VAR(&CMD) TYPE(*CHAR) LEN(500)
+
+             /* Check if the console is ready (user provided logic) */
+             CHGVAR     VAR(&CMD) VALUE('/QOpenSys/usr/bin/bash +
+                          /home/scripts/robot_client.sh' *BCAT &SCRIPT +
+                          *BCAT &LPAR)
+
+             /* Run the bash script in PASE */
+             STRQSH     CMD(&CMD)
+             MONMSG     MSGID(QSH0005) EXEC(DO)
+                /* Handle non-zero exit status from the shell script */
+                SNDPGMMSG  MSG('Robot automation failed. Check logs.') +
+                             MSGTYPE(*ESCAPE)
+             ENDDO
+
+             SNDPGMMSG  MSG('Robot automation completed successfully.')
+
+ENDPGM
