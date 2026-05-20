@@ -95,16 +95,16 @@ HMC_USER="hmc_admin"
 HMC_PWD="hmc_password"
 HMC_SYSNAME="MY_POWER_SYSTEM"
 HMC_LPARNAME="MY_LPAR"
-HMC_SESSION_KEY="session1" # Required for HMC connections
+HMC_SESSION_KEY="session1" # Optional
 TN5250_USER="MY_USER"
 TN5250_PASSWORD="MY_PASSWORD"
 ```
 
 ### Step 3: Define the Automation Workflow
 
-Create a YAML file defining your steps.
+Create a YAML file defining your steps. All automation scripts should be stored in the `yaml_scripts/` directory.
 
-**`my_automation.yaml`:**
+**`yaml_scripts/my_automation.yaml`:**
 
 ```yaml
 name: "Log in and Navigate"
@@ -154,7 +154,7 @@ steps:
 | `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`). | `key`                                                                            |
 | `sleep`                      | Pauses execution for a specified number of seconds.                                    | `seconds`                                                                        |
 | `capture`                    | Saves a screen capture to the `captures/` directory.                                   | `filename`                                                                       |
-| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                             | `text`, `key`, `timeout_seconds`, `wait_ms`                                      |
+| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                             | `text`, `key`, `timeout_seconds`                                                 |
 | `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                | `row`, `col`                                                                     |
 | `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
 | `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
@@ -173,7 +173,7 @@ Execute the robot using the `run-robot.sh` script, providing the YAML file and t
 
 #### Debug Mode
 
-To see detailed logs and automatic screen captures for every step, set the `LOG_LEVEL` environment variable to `debug`. Note that the LPAR name provided as the second argument becomes the `TN5250_HOST` used for folder pathing.
+To see detailed logs and automatic screen captures for every step:
 
 ```bash
 LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
@@ -185,7 +185,7 @@ Debug captures are stored in `logs/captures/<host>/`.
 
 - `robot_py/`: The core RPA engine logic (Python 3.12+).
 - `run-robot.sh`: Main entry point. Handles environment loading, connectivity checks, and tmux session management.
-- `example_script.yaml`: A sample automation workflow.
+- `yaml_scripts/`: Directory containing all YAML automation scripts and common components.
 - `captures/`: Host-specific screen captures.
 - `logs/`: Application logs and debug captures.
 - `tests/`: Automated test suite for the engine and schema validation.
