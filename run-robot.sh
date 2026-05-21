@@ -219,6 +219,7 @@ export TMUX_SESSION
 set +e
 log_message "--- Starting RPA Automation (Python) ---"
 PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.cli --yaml-file "$YAML_FILE"
+EXIT_CODE=$?
 set -e # Re-enable exit on error
 
 log_message "--- Robot Finished ---"
