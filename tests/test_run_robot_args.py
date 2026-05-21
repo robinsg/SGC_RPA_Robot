@@ -59,7 +59,38 @@ def test_yaml_file_not_found():
     # It should pass argument parsing but fail at file check
     result = run_script(["-f", "non_existent.yaml", "-h", "test_host"])
     assert result.returncode == 1
-    assert "Error: YAML file 'non_existent.yaml' not found." in result.stderr
+    assert "Error: YAML file 'non_existent.yaml' not found (checked current directory and yaml_scripts/)." in result.stderr
+
+def test_yaml_file_in_yaml_scripts(tmp_path):
+    # Create yaml_scripts directory and a test file
+    yaml_scripts_dir = tmp_path / "yaml_scripts"
+    yaml_scripts_dir.mkdir()
+    yaml_file = yaml_scripts_dir / "test_in_scripts.yaml"
+    yaml_file.write_text("name: test_in_scripts")
+
+    # Change CWD to tmp_path to run the script
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        # We need to copy run-robot.sh to tmp_path or point to it
+        # Pointing to it is easier if we use absolute path
+        script_path = os.path.join(original_cwd, "run-robot.sh")
+
+        # We also need an .env file for the host check to get far enough
+        env_file = tmp_path / ".env.test_host"
+        env_file.write_text("TN5250_USER=test\nTN5250_PASSWORD=test")
+
+        result = subprocess.run(
+            [script_path, "-f", "test_in_scripts.yaml", "-h", "test_host"],
+            capture_output=True,
+            text=True
+        )
+
+        # It should NOT fail with "file not found"
+        assert "Error: YAML file 'test_in_scripts.yaml' not found" not in result.stderr
+        # It might fail later due to missing tmux/tn5250 in the environment, but that's fine
+    finally:
+        os.chdir(original_cwd)
 
 def test_valid_args_but_missing_env(tmp_path):
     # Use a real file for -f to get past that check

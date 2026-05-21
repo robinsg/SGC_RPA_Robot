@@ -66,14 +66,16 @@ if [[ -z "$YAML_FILE" ]] || [[ -z "$LPAR_NAME" ]]; then
 fi
 
 # Verify YAML file exists
-if [[ ! -f "$YAML_FILE" ]]; then
-  # Fallback to checking inside yaml_scripts/
-  if [[ -f "yaml_scripts/$YAML_FILE" ]]; then
+# Search for the YAML file:
+# 1. At the provided path
+# 2. In the yaml_scripts directory
+if [[ -f "$YAML_FILE" ]]; then
+    : # File found at provided path
+elif [[ -f "yaml_scripts/$YAML_FILE" ]]; then
     YAML_FILE="yaml_scripts/$YAML_FILE"
-  else
-    echo "Error: YAML file '$YAML_FILE' not found." >&2
+else
+    echo "Error: YAML file '$YAML_FILE' not found (checked current directory and yaml_scripts/)." >&2
     exit 1
-  fi
 fi
 
 LPAR_NAME_LOWER=$(echo "$LPAR_NAME" | tr '[:upper:]' '[:lower:]')
