@@ -143,6 +143,7 @@ class RobotEngine:
         self.host = os.environ.get("TN5250_HOST", "unknown_host")
         self.log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
         self.last_logged_title = ""
+        self.history_screens: List[str] = [] # Initialize screen history
 
         device_type = os.environ.get("TN5250_DEVICE_TYPE", "IBM-3477-FC")
         if device_type in SUPPORTED_27x132:
@@ -153,6 +154,22 @@ class RobotEngine:
             self.max_cols = 80
         else:
             raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
+
+    def _get_screen_title(self, pane_content: str) -> str:
+        """Extracts the screen title from the pane content.
+
+        Args:
+            pane_content: The raw text content of the pane.
+
+        Returns:
+            The detected screen title, or an empty string if no title is found.
+        """
+        lines = pane_content.splitlines()
+        for line in lines[:5]:  # Only scan the first 5 lines for a title.
+            trimmed = line.strip()
+            if trimmed:
+                return trimmed
+        return ""
 
     def run_tmux(self, args: List[str]) -> str:
         """Execute a tmux command and return its output.
@@ -283,21 +300,17 @@ class RobotEngine:
             The raw text content of the pane.
         """
         pane_content = self.run_tmux(["capture-pane", "-t", self.session, "-p"])
-
-        lines = pane_content.splitlines()
-        new_title = ""
-
-        # Only scan the first 5 lines for a title.
-        search_lines = lines[:5]
-        for line in search_lines:
-            trimmed = line.strip()
-            if trimmed:
-                new_title = trimmed
-                break
+        new_title = self._get_screen_title(pane_content)
 
         if new_title and new_title != self.last_logged_title:
             logger.info(f"[Screen] {new_title}")
             self.last_logged_title = new_title
+            # Store unique screens in history
+            if not self.history_screens or self.history_screens[-1] != pane_content:
+                self.history_screens.append(pane_content)
+            # Keep history to a reasonable size, e.g., last 20 screens
+            if len(self.history_screens) > 20:
+                self.history_screens.pop(0)
 
         return pane_content
 
@@ -502,7 +515,8 @@ class RobotEngine:
                 )
                 return
 
-            self.capture_pane()
+            initial_pane_content = self.capture_pane()
+            self.history_screens.append(initial_pane_content)
 
             for i, step in enumerate(self.script.steps):
                 desc = f" ({step.description})" if step.description else ""
@@ -537,17 +551,36 @@ class RobotEngine:
                 elif isinstance(step, SleepAction):
                     time.sleep(step.seconds)
                 elif isinstance(step, CaptureAction):
-                    capture = self.capture_pane()
+                    current_screen_content = self.capture_pane()
                     timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
                     host_dir = os.path.join(os.getcwd(), "captures", self.host)
                     os.makedirs(host_dir, exist_ok=True)
 
                     base_name = step.filename or "capture"
-                    final_filename = f"{base_name}_{timestamp}.txt"
+
+                    if "Sign On" in current_screen_content:
+                        # Find the last but one screen from history
+                        prev_screen_content = ""
+                        for i in range(len(self.history_screens) - 2, -1, -1):
+                            if self._get_screen_title(self.history_screens[i]) != self._get_screen_title(current_screen_content):
+                                prev_screen_content = self.history_screens[i]
+                                break
+                        
+                        if prev_screen_content:
+                            capture_content = prev_screen_content + "\n\nSign off successful\n"
+                            final_filename = f"{base_name}_signoff_success_{timestamp}.txt"
+                        else:
+                            # Fallback if no distinct previous screen found, but still sign on
+                            capture_content = current_screen_content + "\n\nSign off successful\n"
+                            final_filename = f"{base_name}_signoff_success_fallback_{timestamp}.txt"
+                    else:
+                        capture_content = current_screen_content
+                        final_filename = f"{base_name}_{timestamp}.txt"
+                    
                     save_path = os.path.join(host_dir, final_filename)
 
                     with open(save_path, "w") as f:
-                        f.write(capture)
+                        f.write(capture_content)
                     logger.info(f"[Capture] Saved to {save_path}")
                 elif isinstance(step, WaitForTextAction):
                     self.wait_for_text(
@@ -664,6 +697,22 @@ class RobotEngine:
                 self.capture_pane()
 
             logger.info("Automation complete!")
+
+        except Exception as e:
+            logger.error(f"Error during automation: {str(e)}")
+            try:
+                error_pane_content = self.capture_pane()
+                timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+                host_dir = os.path.join(os.getcwd(), "captures", self.host)
+                os.makedirs(host_dir, exist_ok=True)
+                error_filename = f"error_screen_{timestamp}.txt"
+                error_save_path = os.path.join(host_dir, error_filename)
+                with open(error_save_path, "w") as f:
+                    f.write(error_pane_content)
+                logger.error(f"[Error Capture] Screen saved to {error_save_path}")
+            except Exception as capture_e:
+                logger.warning(f"Failed to capture screen during error: {str(capture_e)}")
+            raise # Re-raise the original exception after capture
 
         finally:
             self.terminate_session()
