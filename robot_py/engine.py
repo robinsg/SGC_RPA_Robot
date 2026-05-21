@@ -586,11 +586,11 @@ class RobotEngine:
                                 break
                         
                         if prev_screen_content:
-                            capture_content = prev_screen_content + "\n\nSign off successful\n"
+                            capture_content = prev_screen_content.rstrip() + "\n\nSign off successful\n"
                             final_filename = f"{base_name}_signoff_success_{timestamp}.txt"
                         else:
                             # Fallback if no distinct previous screen found, but still sign on
-                            capture_content = current_screen_content + "\n\nSign off successful\n"
+                            capture_content = current_screen_content.rstrip() + "\n\nSign off successful\n"
                             final_filename = f"{base_name}_signoff_success_fallback_{timestamp}.txt"
                     else:
                         capture_content = current_screen_content
@@ -727,7 +727,7 @@ class RobotEngine:
                 error_filename = f"error_screen_{timestamp}.txt"
                 error_save_path = os.path.join(host_dir, error_filename)
                 with open(error_save_path, "w") as f:
-                    f.write(error_pane_content)
+                    f.write(error_pane_content.rstrip() + "\n\nError occurred\n")
                 logger.error(f"[Error Capture] Screen saved to {error_save_path}")
             except Exception as capture_e:
                 logger.warning(f"Failed to capture screen during error: {str(capture_e)}")
