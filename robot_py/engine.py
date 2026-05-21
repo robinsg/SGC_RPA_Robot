@@ -1,5 +1,6 @@
 import subprocess
 import os
+import re
 import time
 from datetime import datetime
 from typing import Optional, List, Tuple
@@ -103,10 +104,10 @@ def validate_environment():
     if missing_vars:
         mode = "HMC Proxy" if hmc_host else "Direct IP"
         raise ValueError(
-            f"Missing required environment variables for {mode} connection: {', '.join(missing_vars)}"
+            f"Missing required environment variables for {mode} connection: {", ".join(missing_vars)}"
         )
 
-    # Validate device type if it's set
+    # Validate device type if it\"s set
     device_type = os.environ.get("TN5250_DEVICE_TYPE")
     if device_type and device_type not in (SUPPORTED_27x132 + SUPPORTED_24x80):
         raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
@@ -127,6 +128,24 @@ class RobotEngine:
         max_rows: Maximum rows for the terminal device type.
         max_cols: Maximum columns for the terminal device type.
     """
+
+    def _clean_capture_content(self, content: str) -> str:
+        """Cleans the captured pane content by stripping trailing whitespace
+        and compressing excessive blank lines.
+
+        Args:
+            content: The raw content captured from the tmux pane.
+
+        Returns:
+            The cleaned content.
+        """
+        # Strip trailing whitespace from each line
+        cleaned_lines = [line.rstrip() for line in content.splitlines()]
+        cleaned_content = "\n".join(cleaned_lines)
+
+        # Compress 4 or more consecutive newlines into 3 newlines (2 blank lines)
+        cleaned_content = re.sub(r'\n{4,}', '\n\n\n', cleaned_content)
+        return cleaned_content
 
     def __init__(self, yaml_path: str):
         """Initialize the RobotEngine.
