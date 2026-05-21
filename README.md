@@ -165,10 +165,10 @@ steps:
 
 ### Step 4: Run the Robot
 
-Execute the robot using the `run-robot.sh` script, providing the YAML file and the LPAR name.
+Execute the robot using the `run-robot.sh` script, providing the YAML file and the LPAR name via named arguments.
 
 ```bash
-./run-robot.sh my_automation.yaml pub400.com
+./run-robot.sh --yaml-file my_automation.yaml --host pub400.com
 ```
 
 #### Debug Mode
@@ -176,7 +176,7 @@ Execute the robot using the `run-robot.sh` script, providing the YAML file and t
 To see detailed logs and automatic screen captures for every step:
 
 ```bash
-LOG_LEVEL=debug ./run-robot.sh my_automation.yaml pub400.com
+LOG_LEVEL=debug ./run-robot.sh -f my_automation.yaml -h pub400.com
 ```
 
 Debug captures are stored in `logs/captures/<host>/`.
