@@ -12,7 +12,9 @@ A simple, robust, and YAML-driven automation framework for IBM i (TN5250) system
 - **Advanced Screen Interaction**: Move the cursor, search within rectangular blocks, and extract data from the screen to use in subsequent steps.
 - **Screen State Guarding**: Mandatory wait conditions ensure the host is ready. Supports precise coordinates, rectangular blocks, and automatic message line detection.
 - **Advanced Debugging**: Optional `LOG_LEVEL=debug` mode that captures screen states for every action into a dedicated logs directory.
-- **LPAR-Aware Captures**: Screen captures are automatically organised into folders named after the LPAR name with ISO timestamps.
+- **LPAR-Aware Captures**: Screen captures are automatically organized into folders named after the LPAR name with ISO timestamps.
+  - On successful sign-off, the _previous_ distinct screen is captured with "Sign off successful" appended.
+  - If the robot encounters an error, the screen at the time of the error is captured and saved as `error_screen_<timestamp>.txt`.
 
 ## 🛠 Prerequisites
 
@@ -147,18 +149,18 @@ steps:
 
 ### Supported Actions
 
-| Action                       | Description                                                                            | Key Parameters                                                                   |
-| :--------------------------- | :------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- |
-| `wait_for_text`              | Waits for text to appear. Supports coordinates and block searches.                     | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `timeout_seconds` |
-| `send_text`                  | Sends a string of text to the terminal.                                                | `text`                                                                           |
-| `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`). | `key`                                                                            |
-| `sleep`                      | Pauses execution for a specified number of seconds.                                    | `seconds`                                                                        |
-| `capture`                    | Saves a screen capture to the `captures/` directory.                                   | `filename`                                                                       |
-| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                             | `text`, `key`, `timeout_seconds`                                                 |
-| `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                | `row`, `col`                                                                     |
-| `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
-| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
-| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                           | `length`                                                                         |
+| Action                       | Description                                                                                                                                                            | Key Parameters                                                                   |
+| :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- |
+| `wait_for_text`              | Waits for text to appear. Supports coordinates and block searches.                                                                                                     | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `timeout_seconds` |
+| `send_text`                  | Sends a string of text to the terminal.                                                                                                                                | `text`                                                                           |
+| `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`).                                                                                 | `key`                                                                            |
+| `sleep`                      | Pauses execution for a specified number of seconds.                                                                                                                    | `seconds`                                                                        |
+| `capture`                    | Saves a screen capture to the `captures/` directory. If the final screen is "Sign On", the previous distinct screen is captured and tagged with "Sign off successful". | `filename`                                                                       |
+| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                                                                                                             | `text`, `key`, `timeout_seconds`                                                 |
+| `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                                                                                                | `row`, `col`                                                                     |
+| `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.                                                                                         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
+| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                                                                                                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
+| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                                                                                                           | `length`                                                                         |
 
 **Coordinates**: 5250 coordinates are 1-indexed. Rows are 1-24 (80 col) or 1-27 (132 col).
 **Message Line**: Setting `is_message_line: true` in wait actions automatically targets the status line (line 24 or 27).
@@ -166,6 +168,10 @@ steps:
 ### Step 4: Run the Robot
 
 Execute the robot using the `run-robot.sh` script, providing the YAML file and the LPAR name via named arguments.
+
+### Error Captures
+
+If the robot script encounters an error (e.g., a timeout waiting for text), the screen content at the point of failure is automatically captured to `captures/<host>/error_screen_<timestamp>.txt`.
 
 ```bash
 ./run-robot.sh --yaml-file my_automation.yaml --host pub400.com
