@@ -1,6 +1,5 @@
 import subprocess
 import os
-import re
 import time
 from datetime import datetime
 from typing import Optional, List, Tuple
@@ -128,24 +127,6 @@ class RobotEngine:
         max_rows: Maximum rows for the terminal device type.
         max_cols: Maximum columns for the terminal device type.
     """
-
-    def _clean_capture_content(self, content: str) -> str:
-        """Cleans the captured pane content by stripping trailing whitespace
-        and compressing excessive blank lines.
-
-        Args:
-            content: The raw content captured from the tmux pane.
-
-        Returns:
-            The cleaned content.
-        """
-        # Strip trailing whitespace from each line
-        cleaned_lines = [line.rstrip() for line in content.splitlines()]
-        cleaned_content = "\n".join(cleaned_lines)
-
-        # Compress 4 or more consecutive newlines into 3 newlines (2 blank lines)
-        cleaned_content = re.sub(r'\n{4,}', '\n\n\n', cleaned_content)
-        return cleaned_content
 
     def __init__(self, yaml_path: str):
         """Initialize the RobotEngine.
@@ -318,7 +299,9 @@ class RobotEngine:
         Returns:
             The raw text content of the pane.
         """
-        pane_content = self.run_tmux(["capture-pane", "-t", self.session, "-p"])
+        pane_content = self.run_tmux(
+            ["capture-pane", "-t", self.session, "-p", "-S", "0", "-E", str(self.max_rows - 1)]
+        )
         new_title = self._get_screen_title(pane_content)
 
         if new_title and new_title != self.last_logged_title:
