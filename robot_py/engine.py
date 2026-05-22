@@ -107,7 +107,7 @@ def validate_environment():
             f"Missing required environment variables for {mode} connection: {", ".join(missing_vars)}"
         )
 
-    # Validate device type if it\"s set
+    # Validate device type if it's set
     device_type = os.environ.get("TN5250_DEVICE_TYPE")
     if device_type and device_type not in (SUPPORTED_27x132 + SUPPORTED_24x80):
         raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
