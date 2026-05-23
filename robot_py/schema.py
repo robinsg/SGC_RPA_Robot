@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Type, ClassVar
 import yaml
 import os
 import re
@@ -17,6 +17,13 @@ class Action:
     type: str
     description: Optional[str] = None
 
+    _registry: ClassVar[Dict[str, Type["Action"]]] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if hasattr(cls, "action_type"):
+            Action._registry[cls.action_type] = cls
+
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "Action":
         """Create an Action instance from a dictionary.
@@ -30,29 +37,17 @@ class Action:
         Raises:
             ValueError: If the action type is unknown.
         """
-        action_type = data.get("type")
-        if action_type == "send_text":
-            return SendTextAction(**data)
-        elif action_type == "send_key":
-            return SendKeyAction(**data)
-        elif action_type == "wait_for_text":
-            return WaitForTextAction(**data)
-        elif action_type == "sleep":
-            return SleepAction(**data)
-        elif action_type == "capture":
-            return CaptureAction(**data)
-        elif action_type == "press_key_if_text_present":
-            return PressKeyIfTextPresentAction(**data)
-        elif action_type == "move_cursor":
-            return MoveCursorAction(**data)
-        elif action_type == "search_and_move_cursor":
-            return SearchAndMoveCursorAction(**data)
-        elif action_type == "search_extract_and_send":
-            return SearchExtractAndSendAction(**data)
-        elif action_type == "extract_at_cursor_and_send":
-            return ExtractAtCursorAndSendAction(**data)
+        data_copy = data.copy()
+        action_type = data_copy.get("type")
+        action_class = Action._registry.get(action_type)
+        if action_class:
+            return action_class(**data_copy)
         else:
             raise ValueError(f"Unknown action type: {action_type}")
+
+    def validate(self):
+        """Basic validation for all actions. Overridden by subclasses."""
+        pass
 
 
 @dataclass
@@ -63,6 +58,7 @@ class SendTextAction(Action):
         text: The string to be sent.
     """
 
+    action_type = "send_text"
     text: str = ""
 
 
@@ -74,6 +70,7 @@ class SendKeyAction(Action):
         key: The logical name of the key to send.
     """
 
+    action_type = "send_key"
     key: str = ""
 
 
@@ -91,6 +88,7 @@ class WaitForTextAction(Action):
         timeout_seconds: Maximum time to wait in seconds.
     """
 
+    action_type = "wait_for_text"
     text: str = ""
     row: Optional[int] = None
     col: Optional[int] = None
@@ -98,6 +96,12 @@ class WaitForTextAction(Action):
     end_col: Optional[int] = None
     is_message_line: Optional[bool] = None
     timeout_seconds: int = 10
+
+    def __post_init__(self):
+        if self.row is not None and self.row < 1:
+            raise ValueError(f"Row must be >= 1, got {self.row}")
+        if self.col is not None and self.col < 1:
+            raise ValueError(f"Col must be >= 1, got {self.col}")
 
 
 @dataclass
@@ -108,6 +112,7 @@ class SleepAction(Action):
         seconds: Number of seconds to sleep.
     """
 
+    action_type = "sleep"
     seconds: float = 0.0
 
 
@@ -119,6 +124,7 @@ class CaptureAction(Action):
         filename: Optional base name for the capture file.
     """
 
+    action_type = "capture"
     filename: Optional[str] = None
 
 
@@ -138,6 +144,7 @@ class PressKeyIfTextPresentAction(Action):
         timeout_seconds: Maximum time to wait for the text to appear.
     """
 
+    action_type = "press_key_if_text_present"
     text: str = ""
     key: str = ""
     row: Optional[int] = None
@@ -158,6 +165,7 @@ class MoveCursorAction(Action):
         col: Target column (1-indexed).
     """
 
+    action_type = "move_cursor"
     row: int = 1
     col: int = 1
 
@@ -176,6 +184,7 @@ class SearchAndMoveCursorAction(Action):
         timeout_seconds: Maximum time to wait for the text.
     """
 
+    action_type = "search_and_move_cursor"
     text: str = ""
     row: int = 1
     col: int = 1
@@ -200,6 +209,7 @@ class SearchExtractAndSendAction(Action):
         timeout_seconds: Maximum time to wait for the search text.
     """
 
+    action_type = "search_extract_and_send"
     text: str = ""
     row: int = 1
     col: int = 1
@@ -218,6 +228,7 @@ class ExtractAtCursorAndSendAction(Action):
         length: Number of characters to extract.
     """
 
+    action_type = "extract_at_cursor_and_send"
     length: int = 1
 
 

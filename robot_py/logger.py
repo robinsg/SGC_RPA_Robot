@@ -1,13 +1,10 @@
 import logging
 import os
+import re
 
 
 class CustomFormatter(logging.Formatter):
-    """Custom formatter for the console with colours.
-
-    This formatter applies ANSI escape codes to the log output based on the
-    log level, providing a more readable and visually distinct console log.
-    """
+    """Custom formatter for the console with colours and masking."""
 
     grey = "\x1b[38;20m"
     yellow = "\x1b[33;20m"
@@ -24,30 +21,27 @@ class CustomFormatter(logging.Formatter):
         logging.CRITICAL: bold_red + format_str + reset,
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sensitive_patterns = []
+        for key in ["TN5250_PASSWORD", "HMC_PWD"]:
+            val = os.environ.get(key)
+            if val and len(val) > 3:
+                self.sensitive_patterns.append(re.escape(val))
+
     def format(self, record: logging.LogRecord) -> str:
-        """Format the log record with colours.
-
-        Args:
-            record: The log record to format.
-
-        Returns:
-            The formatted log message as a string.
-        """
+        """Format the log record with colours and mask sensitive data."""
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S.%3N")
-        return formatter.format(record)
+        msg = formatter.format(record)
+
+        for pattern in self.sensitive_patterns:
+            msg = re.sub(pattern, "********", msg)
+        return msg
 
 
 def setup_logger() -> logging.Logger:
-    """Initialise and configure the application logger.
-
-    Sets up a logger with two handlers:
-    1. A FileHandler that logs to a file named after the target host.
-    2. A StreamHandler (console) that uses CustomFormatter for coloured output.
-
-    Returns:
-        The configured logging.Logger instance.
-    """
+    """Initialise and configure the application logger."""
     lpar_name = os.environ.get("TN5250_HOST", "unknown-lpar")
     log_dir = os.environ.get("LOG_DIR", "logs")
     log_level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -62,11 +56,10 @@ def setup_logger() -> logging.Logger:
     logger = logging.getLogger("robot")
     logger.setLevel(log_level)
 
-    # Avoid duplicate handlers if setup_logger is called multiple times
     if logger.handlers:
         return logger
 
-    # File handler with the CSV-like format
+    # File handler
     file_handler = logging.FileHandler(log_file)
     file_formatter = logging.Formatter(
         f"%(asctime)s,{lpar_name},%(message)s", datefmt="%Y-%m-%d %H:%M:%S.%3N"
@@ -74,7 +67,7 @@ def setup_logger() -> logging.Logger:
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
 
-    # Console handler with the readable format
+    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(CustomFormatter())
     logger.addHandler(console_handler)
