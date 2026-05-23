@@ -39,6 +39,7 @@ The repo structure is intentional. **Never reorganise it.**
 ### Python
 
 - Target Python 3.12+ syntax.
+- All python must comform to PEP 8 standars
 - All Python must pass `ruff check` and `black --check` without errors.
 - Use type hints on all new function signatures.
 - Do not add `mypy` — it is not part of this project's toolchain.
