@@ -1,0 +1,64 @@
+{
+  "rules": [
+    {
+      "name": "5250 Coordinate System",
+      "description": "5250 coordinates are 1-indexed (Row 1-24/27, Col 1-80/132). Always verify coordinates against standard IBM i layouts.",
+      "pattern": "**/*.yaml"
+    },
+    {
+      "name": "YAML Action Schema",
+      "description": "Valid actions: wait_for_text, send_text, send_key, sleep, capture, press_key_if_text_present, move_cursor, search_and_move_cursor, search_extract_and_send, extract_at_cursor_and_send. Check robot_py/schema.py before adding new ones.",
+      "pattern": "**/*.yaml"
+    },
+    {
+      "name": "Tmux Session Safety",
+      "description": "Always check if the tmux session defined in the YAML exists before attempting to send keys or capture content.",
+      "pattern": "robot_py/**/*.py"
+    },
+    {
+      "name": "No src/ Restructure",
+      "description": "Do not move Python code into a src/ layout. The robot_py/ directory is the correct and permanent location for all Python source. Do not suggest or implement this change.",
+      "pattern": "**/*.py"
+    },
+    {
+      "name": "No Poetry Migration",
+      "description": "This project uses requirements.txt for dependency management. Do not migrate to Poetry, pyproject.toml-based dependency management, or any other tool. requirements.txt is intentional.",
+      "pattern": "**/*"
+    },
+    {
+      "name": "Ignore ts_backup",
+      "description": "The ts_backup/ directory contains archived TypeScript/React code. Do not edit, lint, generate code in, or reference this directory. Treat it as read-only historical archive.",
+      "pattern": "ts_backup/**/*"
+    },
+    {
+      "name": "Shell Script Quality",
+      "description": "All .sh files must pass shellcheck. Begin every shell script with 'set -euo pipefail'. Always quote variables using double quotes: \"$VAR\" not $VAR.",
+      "pattern": "**/*.sh"
+    },
+    {
+      "name": "Python Formatting",
+      "description": "All Python code must pass 'ruff check' and 'black --check' targeting Python 3.12. Do not introduce mypy — it is not used in this project.",
+      "pattern": "robot_py/**/*.py"
+    },
+    {
+      "name": "Google-Style Docstrings",
+      "description": "All Python functions and classes must have Google-style docstrings with Args:, Returns:, and Raises: sections where applicable.",
+      "pattern": "robot_py/**/*.py"
+    },
+    {
+      "name": "No Hardcoded Secrets",
+      "description": "Never hardcode credentials, hostnames, passwords, or API keys in Python or shell files. All secrets must be loaded from .env.<lpar> environment files which are git-ignored.",
+      "pattern": "**/*.py"
+    },
+    {
+      "name": "Test Mocking Strategy",
+      "description": "Tests in tests/ must mock libtmux using unittest.mock or pytest-mock. Never write tests that require a live terminal session or real IBM i connection.",
+      "pattern": "tests/**/*.py"
+    },
+    {
+      "name": "CI Compliance",
+      "description": "All generated code must pass the three GitHub Actions workflows: lint.yml (ruff, black, shellcheck), test.yml (pytest), and security.yml (gitleaks, safety). Do not suggest commits that would fail CI.",
+      "pattern": "**/*"
+    }
+  ]
+}
