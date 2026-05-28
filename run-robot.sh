@@ -97,7 +97,7 @@ LPAR_NAME_LOWER=$(echo "$LPAR_NAME" | tr '[:upper:]' '[:lower:]')
 if [[ -n "$ENV_FILE_ARG" ]]; then
     ENV_BASE=$(basename "$ENV_FILE_ARG")
     if [[ "$ENV_BASE" != .env* ]]; then
-        echo "Error: Environment file name must start with '.env' to ensure it is ignored by git." >&2
+        echo "Error: Environment file name must start with '.env.'" >&2
         exit 1
     fi
     ENV_FILE="$ENV_FILE_ARG"
