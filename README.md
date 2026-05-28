@@ -169,13 +169,25 @@ steps:
 
 Execute the robot using the `run-robot.sh` script, providing the YAML file and the LPAR name via named arguments.
 
-### Error Captures
-
-If the robot script encounters an error (e.g., a timeout waiting for text), the screen content at the point of failure is automatically captured to `captures/<host>/error_screen_<timestamp>.txt`.
-
 ```bash
 ./run-robot.sh --yaml-file my_automation.yaml --host pub400.com
 ```
+
+#### Custom Environment Files
+
+By default, the robot looks for a file named `.env.<host>` (e.g., `.env.pub400.com`). You can specify a custom environment file using the `-e` or `--env` flag.
+
+**Requirements for custom environment files:**
+- The filename **must** start with `.env` (e.g., `.env.production`, `.env.test.local`) to ensure it is ignored by git.
+- The file must contain valid `KEY=VALUE` pairs.
+
+```bash
+./run-robot.sh -f my_automation.yaml -h pub400.com -e .env.custom
+```
+
+### Error Captures
+
+If the robot script encounters an error (e.g., a timeout waiting for text), the screen content at the point of failure is automatically captured to `captures/<host>/error_screen_<timestamp>.txt`.
 
 #### Debug Mode
 

@@ -15,14 +15,17 @@ usage() {
     echo "Options:"
     echo "  -f, --yaml-file <path>    Path to the YAML automation script"
     echo "  -h, --host <name>         LPAR host name (e.g., pub400.com)"
+    echo "  -e, --env <path>          Path to the environment file (must start with '.env')"
     echo "  --help                    Show this help message and exit"
     echo ""
     echo "Example:"
     echo "  $0 -f my_script.yaml -h pub400.com"
+    echo "  $0 -f my_script.yaml -h pub400.com -e .env.custom"
 }
 
 YAML_FILE=""
 LPAR_NAME=""
+ENV_FILE_ARG=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -39,6 +42,16 @@ while [[ $# -gt 0 ]]; do
         -h|--host)
             if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
                 LPAR_NAME="$2"
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                usage
+                exit 1
+            fi
+            ;;
+        -e|--env)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+                ENV_FILE_ARG="$2"
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
@@ -80,6 +93,18 @@ fi
 
 LPAR_NAME_LOWER=$(echo "$LPAR_NAME" | tr '[:upper:]' '[:lower:]')
 
+# Validate environment file if provided
+if [[ -n "$ENV_FILE_ARG" ]]; then
+    ENV_BASE=$(basename "$ENV_FILE_ARG")
+    if [[ "$ENV_BASE" != .env* ]]; then
+        echo "Error: Environment file name must start with '.env' to ensure it is ignored by git." >&2
+        exit 1
+    fi
+    ENV_FILE="$ENV_FILE_ARG"
+else
+    ENV_FILE=".env.${LPAR_NAME_LOWER}"
+fi
+
 # --- Unified Logging Function ---
 # Logs a message to both stdout and the appropriate log file.
 log_message() {
@@ -97,7 +122,6 @@ log_message() {
 
 
 # --- Configuration Loading ---
-ENV_FILE=".env.${LPAR_NAME_LOWER}"
 if [ -f "$ENV_FILE" ]; then
   log_message "Loading environment variables from $ENV_FILE"
   # allexport ensures all variables in the sourced file are exported
@@ -218,7 +242,7 @@ export TMUX_SESSION
 # Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
 set +e
 log_message "--- Starting RPA Automation (Python) ---"
-PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.cli --yaml-file "$YAML_FILE"
+PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.cli --yaml-file "$YAML_FILE" --env "$ENV_FILE"
 EXIT_CODE=$?
 set -e # Re-enable exit on error
 

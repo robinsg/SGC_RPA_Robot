@@ -5,11 +5,42 @@ from .engine import RobotEngine
 from .logger import logger
 
 
+def load_env_file(filepath: str):
+    """Loads environment variables from a file into os.environ.
+
+    Args:
+        filepath: The path to the environment file.
+
+    Raises:
+        FileNotFoundError: If the environment file does not exist.
+    """
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Environment file not found: {filepath}")
+
+    with open(filepath, "r") as f:
+        for line in f:
+            # Strip comments and whitespace
+            line = line.split("#", 1)[0].strip()
+            if not line:
+                continue
+
+            # Remove 'export ' prefix if present
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
+
+            if "=" in line:
+                key, value = line.split("=", 1)
+                # Remove optional quotes from the value
+                value = value.strip().strip("\"'")
+                os.environ[key.strip()] = value
+
+
 def main():
     """Main entry point for the robot_py CLI.
 
-    Parses command-line arguments, initialises the RobotEngine with the
-    provided YAML script, and starts the automation.
+    Parses command-line arguments, optionally loads environment variables
+    from a file, initialises the RobotEngine with the provided YAML script,
+    and starts the automation.
 
     Raises:
         SystemExit: If no script path is provided or an error occurs.
@@ -18,11 +49,18 @@ def main():
     parser.add_argument(
         "-f", "--yaml-file", help="Path to the YAML automation script", required=True
     )
+    parser.add_argument(
+        "-e", "--env", help="Path to the environment file", required=False
+    )
 
     args = parser.parse_args()
     yaml_arg = args.yaml_file
+    env_arg = args.env
 
     try:
+        if env_arg:
+            load_env_file(env_arg)
+
         yaml_path = os.path.abspath(yaml_arg)
         engine = RobotEngine(yaml_path)
         engine.run()
