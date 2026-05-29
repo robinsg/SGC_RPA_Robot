@@ -161,6 +161,8 @@ steps:
 | `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.                                                                                         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
 | `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                                                                                                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
 | `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                                                                                                           | `length`                                                                         |
+| `search_and_compare`         | Searches for text and executes conditional steps. Supports single/multiple search strings and Line, Positional, or Block checks.                                       | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `if_true`, `if_false` |
+| `terminate`                  | Immediately stops the robot's execution. Useful within `if_true` or `if_false` blocks.                                                                                 | `reason`                                                                         |
 
 **Coordinates**: 5250 coordinates are 1-indexed. Rows are 1-24 (80 col) or 1-27 (132 col).
 **Message Line**: Setting `is_message_line: true` in wait actions automatically targets the status line (line 24 or 27).
