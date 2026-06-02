@@ -163,17 +163,21 @@ class RobotEngine:
         else:
             raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
 
-    def _get_screen_title(self, pane_content: str) -> str:
+    def _get_screen_title(self, pane_content: str, current_rows: Optional[int] = None) -> str:
         """Extracts the screen title from the pane content.
 
         Args:
             pane_content: The raw text content of the pane.
+            current_rows: The current active row count to restrict title scanning to.
 
         Returns:
             The detected screen title, or an empty string if no title is found.
         """
         lines = pane_content.splitlines()
-        for line in lines[:5]:  # Only scan the first 5 lines for a title.
+        scan_limit = 5
+        if current_rows is not None:
+            scan_limit = min(5, current_rows)
+        for line in lines[:scan_limit]:  # Only scan up to the first 5 or current_rows lines for a title.
             trimmed = line.strip()
             if trimmed:
                 return trimmed
@@ -299,6 +303,37 @@ class RobotEngine:
             for _ in range(-col_diff):
                 self.run_tmux(["send-keys", "-t", self.session, "Left"])
 
+    def _detect_current_screen_dimensions(self, pane_content: str) -> Tuple[int, int]:
+        """Detect current active screen dimensions based on 5250 status line.
+
+        For 27x132 capable devices, checks if the status line has '/' at col 76 on line 28 (DS4)
+        or line 25 (DS3). Defaults to 24x80 if not found or if the device is a 24x80 only device.
+
+        Args:
+            pane_content: The raw captured pane content.
+
+        Returns:
+            Tuple of (rows, cols) representing current mode.
+        """
+        if self.max_rows < 27:
+            return 24, 80
+
+        lines = pane_content.splitlines()
+
+        # Check line 28 (0-indexed 27) for 27x132 screen
+        if len(lines) >= 28:
+            line_28 = lines[27]
+            if len(line_28) >= 76 and line_28[75] == "/":
+                return 27, 132
+
+        # Check line 25 (0-indexed 24) for 24x80 screen
+        if len(lines) >= 25:
+            line_25 = lines[24]
+            if len(line_25) >= 76 and line_25[75] == "/":
+                return 24, 80
+
+        return 24, 80
+
     def capture_pane(self) -> str:
         """Capture the current content of the tmux pane.
 
@@ -307,10 +342,14 @@ class RobotEngine:
         Returns:
             The raw text content of the pane.
         """
+        # Capture the entire possible buffer up to self.max_rows plus any extra status lines (e.g., 28 lines)
+        # To capture status line at row 28, we need 28 lines (indices 0 to 27)
+        max_capture_rows = 28 if self.max_rows == 27 else 25
         pane_content = self.run_tmux(
-            ["capture-pane", "-t", self.session, "-p", "-S", "0", "-E", str(self.max_rows - 1)]
+            ["capture-pane", "-t", self.session, "-p", "-S", "0", "-E", str(max_capture_rows - 1)]
         )
-        new_title = self._get_screen_title(pane_content)
+        current_rows, _ = self._detect_current_screen_dimensions(pane_content)
+        new_title = self._get_screen_title(pane_content, current_rows)
 
         if new_title and new_title != self.last_logged_title:
             logger.info(f"[Screen] {new_title}")
@@ -369,10 +408,11 @@ class RobotEngine:
         is_message_line: Optional[bool] = None,
     ) -> bool:
         """Helper to search for a single text string."""
-        lines = pane_content.splitlines()
+        current_rows, current_cols = self._detect_current_screen_dimensions(pane_content)
+        lines = pane_content.splitlines()[:current_rows]
 
         if is_message_line:
-            message_line_index = 26 if self.max_rows == 27 else 23
+            message_line_index = current_rows - 1
             line = lines[message_line_index] if len(lines) > message_line_index else ""
             return text in line
         elif (
@@ -382,21 +422,30 @@ class RobotEngine:
             and end_col is not None
         ):
             # Coordinates are 1-indexed in YAML
-            self.validate_block(row, col, end_row, end_col)
+            # Validate against dynamic screen dimensions to prevent reading beyond
+            if row > current_rows or end_row > current_rows or col > current_cols or end_col > current_cols:
+                raise ValueError(
+                    f"Block coordinates ({row},{col}) to ({end_row},{end_col}) out of active bounds for {current_rows}x{current_cols} screen"
+                )
             search_area_lines = lines[row - 1 : end_row]
             search_area = "\n".join(
                 [line[col - 1 : end_col] for line in search_area_lines]
             )
             return text in search_area
         elif row is not None:
-            self.validate_coords(row, col or 1)
+            if row > current_rows or (col is not None and col > current_cols):
+                raise ValueError(
+                    f"Coordinates ({row},{col or 1}) out of active bounds for {current_rows}x{current_cols} screen"
+                )
             line = lines[row - 1] if len(lines) > row - 1 else ""
             if col is not None:
                 return text in line[col - 1 :]
             else:
                 return text in line
         else:
-            return text in pane_content
+            # For full buffer search, search only the actively displayed lines
+            trimmed_content = "\n".join(lines)
+            return text in trimmed_content
 
     def find_text_in_block(
         self,
