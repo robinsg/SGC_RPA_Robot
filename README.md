@@ -7,12 +7,12 @@ A simple, robust, and YAML-driven automation framework for IBM i (TN5250) system
 - **YAML-First Automation**: Define your terminal steps in plain, structured YAML.
 - **HMC & Direct IP Support**: Connect directly via IP or through an HMC 5250 Proxy.
 - **Managed Tmux Sessions**: Runs inside `tmux` for reliability, with automated session lifecycle management.
-- **Dynamic Variable Injection**: Use `${VARIABLE_NAME}` or `${VAR:-default}` in your YAML, loaded from environment variables.
+- **Dynamic Variable Injection**: Use `${VARIABLE_NAME}` or `${VAR:-default}` in your YAML for environment variables (loaded at parse time), and `{{VAR}}` for runtime variables (extracted during execution).
 - **Conditional Logic**: Handle optional screens like "Sign On Information" with the `press_key_if_text_present` action.
 - **Advanced Screen Interaction**: Move the cursor, search within rectangular blocks, and extract data from the screen to use in subsequent steps.
 - **Screen State Guarding**: Mandatory wait conditions ensure the host is ready. Supports precise coordinates, rectangular blocks, and automatic message line detection.
 - **Advanced Debugging**: Optional `LOG_LEVEL=debug` mode that captures screen states for every action into a dedicated logs directory.
-- **LPAR-Aware Captures**: Screen captures are automatically organized into folders named after the LPAR name with ISO timestamps.
+- **LPAR-Aware Captures**: Screen captures are automatically organised into folders named after the LPAR name with ISO timestamps.
   - On successful sign-off, the _previous_ distinct screen is captured with "Sign off successful" appended.
   - If the robot encounters an error, the screen at the time of the error is captured and saved as `error_screen_<timestamp>.txt`.
 
@@ -83,7 +83,7 @@ TN5250_PORT=992    # Optional: defaults to 992 for SSL, 23 for non-SSL
 
 # Supported Terminal Types:
 # 27x132: IBM-3477-FC, IBM-3477-FG, IBM-3180-2
-# 24x80:  IBM-3179-2, IBM-3196-A1, IBM-5292-2, IBM-5291-1, IBM-5251-11
+# 24x80:  IBM-3179-2, IBM-3196-A1, IBM-5292-2, IBM-5291-1, IBM-5291-11
 TN5250_DEVICE_TYPE="IBM-3477-FC"
 
 TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
@@ -159,11 +159,39 @@ steps:
 | `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                                                                                                             | `text`, `key`, `timeout_seconds`                                                 |
 | `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                                                                                                | `row`, `col`                                                                     |
 | `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.                                                                                         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
-| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                                                                                                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
-| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                                                                                                           | `length`                                                                         |
+| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                                                                                                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`, `store_as`      |
+| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                                                                                                           | `length`, `store_as`                                                                         |
+| `compare` | Extracts text (by position or search) or takes a direct value, and compares it against an expected value. | `operator`, `expected`, `row`, `col`, `length`, `search_text`, `value`, `store_as`, `extract_col`, `extract_length` |
+| `search_and_compare`         | Searches for text and executes conditional steps. Supports single/multiple search strings and Line, Positional, or Block checks.                                       | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `if_true`, `if_false` |
+| `terminate`                  | Immediately stops the robot's execution. Useful within `if_true` or `if_false` blocks.                                                                                 | `reason`                                                                         |
 
 **Coordinates**: 5250 coordinates are 1-indexed. Rows are 1-24 (80 col) or 1-27 (132 col).
 **Message Line**: Setting `is_message_line: true` in wait actions automatically targets the status line (line 24 or 27).
+
+### Variables and Comparisons
+
+The robot supports two types of variables:
+
+1.  **Environment Variables**: `${VAR_NAME}`. These are substituted when the script is loaded.
+2.  **Runtime Variables**: `{{VAR_NAME}}`. These are substituted at the moment a step is executed. You can populate these using the `store_as` parameter in extraction and comparison actions.
+
+**Example Comparison:**
+
+```yaml
+- type: "compare"
+  search_text: "QSECURITY"
+  row: 1
+  col: 1
+  end_row: 24
+  end_col: 80
+  extract_col: 30
+  extract_length: 2
+  operator: "GE"
+  expected: "40"
+  description: "Ensure system security level is at least 40"
+```
+
+**Supported Operators**: `EQ`, `NE`, `GT`, `LT`, `GE`, `LE`, `CONTAINS`. Numeric operators (`GT`, `LT`, `GE`, `LE`) will attempt to convert values to numbers before comparing.
 
 ### Step 4: Run the Robot
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Union
 import yaml
 import os
 import re
@@ -51,6 +51,16 @@ class Action:
             return SearchExtractAndSendAction(**data)
         elif action_type == "extract_at_cursor_and_send":
             return ExtractAtCursorAndSendAction(**data)
+        elif action_type == "compare":
+            return CompareAction(**data)
+        elif action_type == "search_and_compare":
+            if_true_raw = data.pop("if_true", [])
+            if_false_raw = data.pop("if_false", [])
+            data["if_true"] = [Action.from_dict(a) for a in if_true_raw]
+            data["if_false"] = [Action.from_dict(a) for a in if_false_raw]
+            return SearchAndCompareAction(**data)
+        elif action_type == "terminate":
+            return TerminateAction(**data)
         else:
             raise ValueError(f"Unknown action type: {action_type}")
 
@@ -198,6 +208,7 @@ class SearchExtractAndSendAction(Action):
         extract_col: The starting column to extract text from.
         extract_length: The number of characters to extract.
         timeout_seconds: Maximum time to wait for the search text.
+        store_as: Optional variable name to store the extracted value.
     """
 
     text: str = ""
@@ -208,6 +219,7 @@ class SearchExtractAndSendAction(Action):
     extract_col: int = 1
     extract_length: int = 1
     timeout_seconds: int = 10
+    store_as: Optional[str] = None
 
 
 @dataclass
@@ -216,9 +228,84 @@ class ExtractAtCursorAndSendAction(Action):
 
     Attributes:
         length: Number of characters to extract.
+        store_as: Optional variable name to store the extracted value.
     """
 
     length: int = 1
+    store_as: Optional[str] = None
+
+
+@dataclass
+class CompareAction(Action):
+    """Action to extract text and compare it with an expected value.
+
+    Attributes:
+        operator: Comparison operator (EQ, NE, GT, LT, GE, LE, CONTAINS).
+        expected: The value to compare against.
+        row: Starting row (1-indexed).
+        col: Starting column (1-indexed).
+        length: Number of characters to extract (if extracting by position).
+        search_text: The string to search for on the screen.
+        end_row: Ending row for the search area (1-indexed).
+        end_col: Ending column for the search area (1-indexed).
+        extract_col: The column to extract text from on the matching row.
+        extract_length: Number of characters to extract from the matching row.
+        value: A direct value or variable to compare (instead of extracting).
+        timeout_seconds: Maximum time to wait for search text if applicable.
+        store_as: Optional variable name to store the compared value.
+    """
+
+    operator: str = "EQ"
+    expected: str = ""
+    row: Optional[int] = None
+    col: Optional[int] = None
+    length: Optional[int] = None
+    search_text: Optional[str] = None
+    end_row: Optional[int] = None
+    end_col: Optional[int] = None
+    extract_col: Optional[int] = None
+    extract_length: Optional[int] = None
+    value: Optional[str] = None
+    timeout_seconds: int = 10
+    store_as: Optional[str] = None
+
+
+@dataclass
+class SearchAndCompareAction(Action):
+    """Action to search for text and execute different steps based on whether it is found.
+
+    Attributes:
+        text: The string or list of strings to search for.
+        row: Starting row for the search area (1-indexed).
+        col: Starting column for the search area (1-indexed).
+        end_row: Ending row for the search area (1-indexed).
+        end_col: Ending column for the search area (1-indexed).
+        is_message_line: If True, only search the terminal's message line.
+        timeout_seconds: Maximum time to wait for the text to appear.
+        if_true: List of actions to execute if the text is found.
+        if_false: List of actions to execute if the text is not found.
+    """
+
+    text: Union[str, List[str]] = ""
+    row: Optional[int] = None
+    col: Optional[int] = None
+    end_row: Optional[int] = None
+    end_col: Optional[int] = None
+    is_message_line: Optional[bool] = None
+    timeout_seconds: int = 10
+    if_true: List[Action] = field(default_factory=list)
+    if_false: List[Action] = field(default_factory=list)
+
+
+@dataclass
+class TerminateAction(Action):
+    """Action to immediately stop the robot's execution.
+
+    Attributes:
+        reason: Optional explanation for why the robot was terminated.
+    """
+
+    reason: Optional[str] = None
 
 
 @dataclass
