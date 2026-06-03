@@ -92,6 +92,19 @@ TN5250_DEVICE_TYPE="IBM-3477-FC"
 TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
 ```
 
+**Example for HMC Proxy:**
+
+```env
+HMC_HOST="hmc.example.com"
+HMC_USER="hmc_admin"
+HMC_PWD="hmc_password"
+HMC_SYSNAME="MY_POWER_SYSTEM"
+HMC_LPARNAME="MY_LPAR"
+HMC_SESSION_KEY="session1" # Optional
+TN5250_USER="MY_USER"
+TN5250_PASSWORD="MY_PASSWORD"
+```
+
 ### Step 3: Define the Automation Workflow
 
 Create a YAML file defining your steps. All automation scripts should be stored in the `yaml_scripts/` directory.
@@ -193,6 +206,158 @@ EXPECTED_SECURITY="40"
 ```
 
 **Supported Operators**: `EQ`, `NE`, `GT`, `LT`, `GE`, `LE`, `CONTAINS`. Numeric operators (`GT`, `LT`, `GE`, `LE`) will attempt to convert values to numbers before comparing.
+
+## 📝 Examples
+
+This section provides usage examples for every action and feature supported by the 5250 RPA Robot.
+
+### Basic Workflow Example
+This example shows a standard login and navigation flow.
+
+```yaml
+steps:
+  - type: "wait_for_text"
+    text: "User"
+    description: "Wait for login screen"
+
+  - type: "send_text"
+    text: "${TN5250_USER}"
+
+  - type: "send_key"
+    key: "Tab"
+
+  - type: "send_text"
+    text: "${TN5250_PASSWORD}"
+
+  - type: "send_key"
+    key: "Enter"
+
+  - type: "wait_for_text"
+    text: "IBM i Main Menu"
+    description: "Wait for main menu"
+```
+
+### Action Examples
+
+#### wait_for_text
+Waits for text to appear globally or in a specific block.
+```yaml
+- type: "wait_for_text"
+  text: "Selection or command"
+  row: 19
+  col: 2
+  end_row: 21
+  end_col: 40
+  timeout_seconds: 15
+```
+
+#### send_text
+Sends literal text to the cursor's current position.
+```yaml
+- type: "send_text"
+  text: "wrkactjob"
+```
+
+#### send_key
+Sends a special functional key.
+```yaml
+- type: "send_key"
+  key: "F3"
+```
+
+#### sleep
+Pauses the robot for a fixed duration.
+```yaml
+- type: "sleep"
+  seconds: 2.5
+```
+
+#### capture
+Saves the current screen to a file.
+```yaml
+- type: "capture"
+  filename: "system_status"
+```
+
+#### press_key_if_text_present
+Sends a key only if specific text is currently on the screen. Useful for optional screens.
+```yaml
+- type: "press_key_if_text_present"
+  text: "Sign On Information"
+  key: "Enter"
+```
+
+#### move_cursor
+Positions the cursor at specific coordinates.
+```yaml
+- type: "move_cursor"
+  row: 10
+  col: 20
+```
+
+#### search_and_move_cursor
+Finds a label and moves the cursor to a specific column on that same row.
+```yaml
+- type: "search_and_move_cursor"
+  text: "Opt"
+  row: 5
+  col: 1
+  end_row: 15
+  end_col: 10
+  target_col: 2
+```
+
+#### search_extract_and_send
+Finds text, extracts another value from the same row, and types it.
+```yaml
+- type: "search_extract_and_send"
+  text: "Object"
+  row: 1
+  col: 1
+  end_row: 24
+  end_col: 80
+  extract_col: 15
+  extract_length: 10
+  store_as: "OBJ_NAME"
+```
+
+#### extract_at_cursor_and_send
+Extracts text from the current cursor position and types it.
+```yaml
+- type: "extract_at_cursor_and_send"
+  length: 5
+  store_as: "TEMP_ID"
+```
+
+#### compare
+Performs a logical comparison on extracted or direct values.
+```yaml
+- type: "compare"
+  value: "{{MY_VAL}}"
+  operator: "GT"
+  expected: "100"
+  description: "Check if MY_VAL is greater than 100"
+```
+
+#### search_and_compare
+Conditional branching based on text presence.
+```yaml
+- type: "search_and_compare"
+  text: "Display Program Messages"
+  if_true:
+    - type: "send_key"
+      key: "Enter"
+  if_false:
+    - type: "send_text"
+      text: "No messages found"
+```
+
+#### terminate
+Immediately stops the robot execution.
+```yaml
+- type: "terminate"
+  reason: "Reached an unexpected error state"
+```
 
 ### Step 4: Run the Robot
 
