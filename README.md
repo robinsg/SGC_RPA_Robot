@@ -81,25 +81,15 @@ TN5250_MAP="285"   # Keymap (e.g., 285 for UK, 37 for US)
 TN5250_SSL="on"    # "on" or "off"
 TN5250_PORT=992    # Optional: defaults to 992 for SSL, 23 for non-SSL
 
+# Custom variables for use in YAML
+MY_SYSTEM_VAL="40"
+
 # Supported Terminal Types:
 # 27x132: IBM-3477-FC, IBM-3477-FG, IBM-3180-2
 # 24x80:  IBM-3179-2, IBM-3196-A1, IBM-5292-2, IBM-5291-1, IBM-5291-11
 TN5250_DEVICE_TYPE="IBM-3477-FC"
 
 TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
-```
-
-**Example for HMC Proxy:**
-
-```env
-HMC_HOST="hmc.example.com"
-HMC_USER="hmc_admin"
-HMC_PWD="hmc_password"
-HMC_SYSNAME="MY_POWER_SYSTEM"
-HMC_LPARNAME="MY_LPAR"
-HMC_SESSION_KEY="session1" # Optional
-TN5250_USER="MY_USER"
-TN5250_PASSWORD="MY_PASSWORD"
 ```
 
 ### Step 3: Define the Automation Workflow
@@ -119,7 +109,7 @@ steps:
     description: "Wait for login screen"
 
   - type: "send_text"
-    text: "${TN5250_USER}" # Injects variable from .env file
+    text: "${TN5250_USER}" # References variable from .env file
 
   - type: "send_key"
     key: "Tab"
@@ -172,11 +162,17 @@ steps:
 
 The robot supports two types of variables:
 
-1.  **Environment Variables**: `${VAR_NAME}`. These are substituted when the script is loaded.
-2.  **Runtime Variables**: `{{VAR_NAME}}`. These are substituted at the moment a step is executed. You can populate these using the `store_as` parameter in extraction and comparison actions.
+1.  **Environment Variables**: `${VAR_NAME}`. These are defined in your `.env.<host>` file and substituted when the YAML script is loaded.
+2.  **Runtime Variables**: `{{VAR_NAME}}`. These are extracted from the screen during execution and substituted just before each step runs.
 
-**Example Comparison:**
+#### Variable Usage Example
 
+**1. Define environment variable in `.env.pub400.com`:**
+```env
+EXPECTED_SECURITY="40"
+```
+
+**2. Reference in YAML (`yaml_scripts/security_check.yaml`):**
 ```yaml
 - type: "compare"
   search_text: "QSECURITY"
@@ -187,8 +183,13 @@ The robot supports two types of variables:
   extract_col: 30
   extract_length: 2
   operator: "GE"
-  expected: "40"
-  description: "Ensure system security level is at least 40"
+  expected: "${EXPECTED_SECURITY}"
+  store_as: "ACTUAL_SEC"
+  description: "Ensure security level is at least ${EXPECTED_SECURITY}"
+
+- type: "send_text"
+  text: "Current level is {{ACTUAL_SEC}}"
+  description: "Type the extracted value back to the terminal"
 ```
 
 **Supported Operators**: `EQ`, `NE`, `GT`, `LT`, `GE`, `LE`, `CONTAINS`. Numeric operators (`GT`, `LT`, `GE`, `LE`) will attempt to convert values to numbers before comparing.
