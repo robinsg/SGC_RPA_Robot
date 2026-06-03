@@ -633,7 +633,8 @@ class RobotEngine:
             steps: List of Action objects to execute.
         """
         for i, step in enumerate(steps):
-            desc = f" ({step.description})" if step.description else ""
+            description = self._substitute_runtime_vars(step.description)
+            desc = f" ({description})" if description else ""
             logger.info(f"[Step {i + 1}/{len(steps)}] {step.type}{desc}")
             self.execute_step(step)
             self.capture_pane()
@@ -850,7 +851,9 @@ class RobotEngine:
                 if not is_block:
                     lines = last_content.splitlines()
                     actual_value = ""
-                    search_texts = [text] if isinstance(text, str) else text
+                    search_texts = (
+                        [text] if isinstance(text, str) else text
+                    )
                     max_len = max((len(t) for t in search_texts), default=0)
 
                     if step.is_message_line:
@@ -887,9 +890,11 @@ class RobotEngine:
         Iterates through the steps in self.script.steps and performs
         the corresponding actions.
         """
-        logger.info(f"Starting Robot: {self.script.name}")
+        name = self._substitute_runtime_vars(self.script.name)
+        logger.info(f"Starting Robot: {name}")
         if self.script.description:
-            logger.info(f"Description: {self.script.description}")
+            description = self._substitute_runtime_vars(self.script.description)
+            logger.info(f"Description: {description}")
 
         try:
             if not self.check_session_exists():
