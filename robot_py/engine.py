@@ -1,8 +1,9 @@
 import subprocess
 import os
+import re
 import time
 from datetime import datetime
-from typing import Optional, List, Tuple, Union
+from typing import Optional, List, Tuple, Union, Dict, Any
 from .schema import (
     parse_robot_script,
     Action,
@@ -106,7 +107,7 @@ def validate_environment():
     if missing_vars:
         mode = "HMC Proxy" if hmc_host else "Direct IP"
         raise ValueError(
-            f"Missing required environment variables for {mode} connection: {", ".join(missing_vars)}"
+            f"Missing required environment variables for {mode} connection: {', '.join(missing_vars)}"
         )
 
     # Validate device type if it's set
@@ -117,6 +118,7 @@ def validate_environment():
 
 class TerminationException(Exception):
     """Custom exception to signal that the robot should terminate immediately."""
+
     pass
 
 
@@ -151,7 +153,10 @@ class RobotEngine:
         self.host = os.environ.get("TN5250_HOST", "unknown_host")
         self.log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
         self.last_logged_title = ""
-        self.history_screens: List[str] = [] # Initialize screen history
+        self.history_screens: List[str] = []  # Initialize screen history
+        self.runtime_variables: Dict[str, str] = {
+            k: str(v) for k, v in os.environ.items()
+        }
 
         device_type = os.environ.get("TN5250_DEVICE_TYPE", "IBM-3477-FC")
         if device_type in SUPPORTED_27x132:
@@ -163,7 +168,9 @@ class RobotEngine:
         else:
             raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
 
-    def _get_screen_title(self, pane_content: str, current_rows: Optional[int] = None) -> str:
+    def _get_screen_title(
+        self, pane_content: str, current_rows: Optional[int] = None
+    ) -> str:
         """Extracts the screen title from the pane content.
 
         Args:
@@ -177,7 +184,9 @@ class RobotEngine:
         scan_limit = 5
         if current_rows is not None:
             scan_limit = min(5, current_rows)
-        for line in lines[:scan_limit]:  # Only scan up to the first 5 or current_rows lines for a title.
+        for line in lines[
+            :scan_limit
+        ]:  # Only scan up to the first 5 or current_rows lines for a title.
             trimmed = line.strip()
             if trimmed:
                 return trimmed
@@ -230,6 +239,30 @@ class RobotEngine:
             )
         else:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
+
+    def _substitute_runtime_vars(self, data: Any) -> Any:
+        """Recursively substitute runtime variables in strings or lists.
+
+        Supports {{VAR_NAME}}.
+
+        Args:
+            data: The data structure to process (str, list, or dict).
+
+        Returns:
+            The data structure with runtime variables substituted.
+        """
+        if isinstance(data, dict):
+            return {k: self._substitute_runtime_vars(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._substitute_runtime_vars(item) for item in data]
+        elif isinstance(data, str):
+
+            def replace_var(match):
+                var_name = match.group(1)
+                return self.runtime_variables.get(var_name, match.group(0))
+
+            return re.sub(r"\{\{(\w+)\}\}", replace_var, data)
+        return data
 
     def validate_coords(self, row: int, col: int):
         """Validate that the given coordinates are within terminal bounds.
@@ -346,7 +379,16 @@ class RobotEngine:
         # To capture status line at row 28, we need 28 lines (indices 0 to 27)
         max_capture_rows = 28 if self.max_rows == 27 else 25
         pane_content = self.run_tmux(
-            ["capture-pane", "-t", self.session, "-p", "-S", "0", "-E", str(max_capture_rows - 1)]
+            [
+                "capture-pane",
+                "-t",
+                self.session,
+                "-p",
+                "-S",
+                "0",
+                "-E",
+                str(max_capture_rows - 1),
+            ]
         )
         current_rows, _ = self._detect_current_screen_dimensions(pane_content)
         new_title = self._get_screen_title(pane_content, current_rows)
@@ -408,7 +450,9 @@ class RobotEngine:
         is_message_line: Optional[bool] = None,
     ) -> bool:
         """Helper to search for a single text string."""
-        current_rows, current_cols = self._detect_current_screen_dimensions(pane_content)
+        current_rows, current_cols = self._detect_current_screen_dimensions(
+            pane_content
+        )
         lines = pane_content.splitlines()[:current_rows]
 
         if is_message_line:
@@ -423,7 +467,12 @@ class RobotEngine:
         ):
             # Coordinates are 1-indexed in YAML
             # Validate against dynamic screen dimensions to prevent reading beyond
-            if row > current_rows or end_row > current_rows or col > current_cols or end_col > current_cols:
+            if (
+                row > current_rows
+                or end_row > current_rows
+                or col > current_cols
+                or end_col > current_cols
+            ):
                 raise ValueError(
                     f"Block coordinates ({row},{col}) to ({end_row},{end_col}) out of active bounds for {current_rows}x{current_cols} screen"
                 )
@@ -584,7 +633,8 @@ class RobotEngine:
             steps: List of Action objects to execute.
         """
         for i, step in enumerate(steps):
-            desc = f" ({step.description})" if step.description else ""
+            description = self._substitute_runtime_vars(step.description)
+            desc = f" ({description})" if description else ""
             logger.info(f"[Step {i + 1}/{len(steps)}] {step.type}{desc}")
             self.execute_step(step)
             self.capture_pane()
@@ -596,17 +646,17 @@ class RobotEngine:
             step: The Action object to perform.
         """
         if isinstance(step, SendTextAction):
-            self.run_tmux(["send-keys", "-l", "-t", self.session, step.text])
+            text = self._substitute_runtime_vars(step.text)
+            self.run_tmux(["send-keys", "-l", "-t", self.session, text])
         elif isinstance(step, SendKeyAction):
-            key_to_send = KEY_MAP.get(step.key, step.key)
-            logger.debug(
-                f"[Key Send] Sending key: '{step.key}' -> tmux: '{key_to_send}'"
-            )
+            key = self._substitute_runtime_vars(step.key)
+            key_to_send = KEY_MAP.get(key, key)
+            logger.debug(f"[Key Send] Sending key: '{key}' -> tmux: '{key_to_send}'")
 
             if self.log_level == "DEBUG":
                 before = self.capture_pane()
                 logger.debug(
-                    f"\n--- Before {step.key} ---\n{before}\n--- End Before {step.key} ---"
+                    f"\n--- Before {key} ---\n{before}\n--- End Before {key} ---"
                 )
 
             self.run_tmux(["send-keys", "-t", self.session, key_to_send])
@@ -614,11 +664,9 @@ class RobotEngine:
 
             if self.log_level == "DEBUG":
                 after = self.capture_pane()
-                logger.debug(
-                    f"\n--- After {step.key} ---\n{after}\n--- End After {step.key} ---"
-                )
+                logger.debug(f"\n--- After {key} ---\n{after}\n--- End After {key} ---")
 
-            self.capture_debug_screen(f"after_send_key_{step.key}")
+            self.capture_debug_screen(f"after_send_key_{key}")
         elif isinstance(step, SleepAction):
             time.sleep(step.seconds)
         elif isinstance(step, CaptureAction):
@@ -627,7 +675,8 @@ class RobotEngine:
             host_dir = os.path.join(os.getcwd(), "captures", self.host)
             os.makedirs(host_dir, exist_ok=True)
 
-            base_name = step.filename or "capture"
+            filename = self._substitute_runtime_vars(step.filename)
+            base_name = filename or "capture"
 
             if "Sign On" in current_screen_content:
                 # Find the last but one screen from history
@@ -662,8 +711,9 @@ class RobotEngine:
                 f.write(capture_content)
             logger.info(f"[Capture] Saved to {save_path}")
         elif isinstance(step, WaitForTextAction):
+            text = self._substitute_runtime_vars(step.text)
             self.wait_for_text(
-                step.text,
+                text,
                 step.timeout_seconds,
                 step.row,
                 step.col,
@@ -671,15 +721,17 @@ class RobotEngine:
                 step.end_col,
                 step.is_message_line,
             )
-            safe_text = "".join([c if c.isalnum() else "_" for c in step.text])
+            safe_text = "".join([c if c.isalnum() else "_" for c in text])
             self.capture_debug_screen(f"after_wait_for_{safe_text}")
         elif isinstance(step, PressKeyIfTextPresentAction):
             settle_time = step.wait_ms / 1000.0 if step.wait_ms is not None else 0.25
             if settle_time > 0:
                 time.sleep(settle_time)
 
+            text = self._substitute_runtime_vars(step.text)
+            key = self._substitute_runtime_vars(step.key)
             found, last_content = self.wait_for_text_internal(
-                step.text,
+                text,
                 step.timeout_seconds,
                 step.row,
                 step.col,
@@ -689,22 +741,23 @@ class RobotEngine:
             )
 
             if found:
-                press_key = KEY_MAP.get(step.key, step.key)
+                press_key = KEY_MAP.get(key, key)
                 logger.info(
-                    f'[Condition] Text "{step.text}" found. Sending key: {step.key} -> tmux: {press_key}'
+                    f'[Condition] Text "{text}" found. Sending key: {key} -> tmux: {press_key}'
                 )
                 self.run_tmux(["send-keys", "-t", self.session, press_key])
                 time.sleep(0.25)
             else:
                 logger.info(
-                    f'[Condition] Text "{step.text}" not found after {step.timeout_seconds}s. Skipping.'
+                    f'[Condition] Text "{text}" not found after {step.timeout_seconds}s. Skipping.'
                 )
         elif isinstance(step, MoveCursorAction):
             logger.info(f"[Cursor] Moving to row {step.row}, col {step.col}")
             self.move_cursor(step.row, step.col)
         elif isinstance(step, SearchAndMoveCursorAction):
+            text = self._substitute_runtime_vars(step.text)
             found, last_content = self.wait_for_text_internal(
-                step.text,
+                text,
                 step.timeout_seconds,
                 step.row,
                 step.col,
@@ -713,24 +766,25 @@ class RobotEngine:
             )
             if not found:
                 raise RuntimeError(
-                    f'Timeout waiting for "{step.text}" in block for SearchAndMoveCursorAction'
+                    f'Timeout waiting for "{text}" in block for SearchAndMoveCursorAction'
                 )
 
             match_row = self.find_text_in_block(
                 last_content,
-                step.text,
+                text,
                 step.row,
                 step.col,
                 step.end_row,
                 step.end_col,
             )
             logger.info(
-                f'[SearchMove] Found "{step.text}" at row {match_row}. Moving cursor to col {step.target_col}'
+                f'[SearchMove] Found "{text}" at row {match_row}. Moving cursor to col {step.target_col}'
             )
             self.move_cursor(match_row, step.target_col)
         elif isinstance(step, SearchExtractAndSendAction):
+            text = self._substitute_runtime_vars(step.text)
             found, last_content = self.wait_for_text_internal(
-                step.text,
+                text,
                 step.timeout_seconds,
                 step.row,
                 step.col,
@@ -739,12 +793,12 @@ class RobotEngine:
             )
             if not found:
                 raise RuntimeError(
-                    f'Timeout waiting for "{step.text}" in block for SearchExtractAndSendAction'
+                    f'Timeout waiting for "{text}" in block for SearchExtractAndSendAction'
                 )
 
             match_row = self.find_text_in_block(
                 last_content,
-                step.text,
+                text,
                 step.row,
                 step.col,
                 step.end_row,
@@ -755,7 +809,7 @@ class RobotEngine:
                 step.extract_col - 1 : step.extract_col - 1 + step.extract_length
             ].strip()
             logger.info(
-                f'[SearchExtract] Found "{step.text}" at row {match_row}. Extracted "{extracted}" from col {step.extract_col}'
+                f'[SearchExtract] Found "{text}" at row {match_row}. Extracted "{extracted}" from col {step.extract_col}'
             )
             self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
         elif isinstance(step, ExtractAtCursorAndSendAction):
@@ -768,8 +822,9 @@ class RobotEngine:
             )
             self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
         elif isinstance(step, SearchAndCompareAction):
+            text = self._substitute_runtime_vars(step.text)
             found, last_content = self.wait_for_text_internal(
-                step.text,
+                text,
                 step.timeout_seconds,
                 step.row,
                 step.col,
@@ -779,10 +834,10 @@ class RobotEngine:
             )
 
             if found:
-                logger.info(f'[Compare] Search for "{step.text}" succeeded.')
+                logger.info(f'[Compare] Search for "{text}" succeeded.')
                 self.execute_steps(step.if_true)
             else:
-                logger.info(f'[Compare] Search for "{step.text}" failed.')
+                logger.info(f'[Compare] Search for "{text}" failed.')
 
                 # Check if it was a line or positional check to report actual value
                 # (either row is set, or is_message_line is set)
@@ -797,7 +852,7 @@ class RobotEngine:
                     lines = last_content.splitlines()
                     actual_value = ""
                     search_texts = (
-                        [step.text] if isinstance(step.text, str) else step.text
+                        [text] if isinstance(text, str) else text
                     )
                     max_len = max((len(t) for t in search_texts), default=0)
 
@@ -818,15 +873,16 @@ class RobotEngine:
                         if 1 <= step.row <= len(lines):
                             actual_value = lines[step.row - 1]
 
-                    msg = f'Search for text failed to find "{step.text}". Actual value found: "{actual_value}".'
+                    msg = f'Search for text failed to find "{text}". Actual value found: "{actual_value}".'
                     logger.info(msg)
                     print(msg)
 
                 self.execute_steps(step.if_false)
         elif isinstance(step, TerminateAction):
-            reason_str = f" Reason: {step.reason}" if step.reason else ""
+            reason = self._substitute_runtime_vars(step.reason)
+            reason_str = f" Reason: {reason}" if reason else ""
             logger.info(f"[Terminate] Robot terminating.{reason_str}")
-            raise TerminationException(step.reason)
+            raise TerminationException(reason)
 
     def run(self):
         """Execute all steps defined in the robot script.
@@ -834,9 +890,11 @@ class RobotEngine:
         Iterates through the steps in self.script.steps and performs
         the corresponding actions.
         """
-        logger.info(f"Starting Robot: {self.script.name}")
+        name = self._substitute_runtime_vars(self.script.name)
+        logger.info(f"Starting Robot: {name}")
         if self.script.description:
-            logger.info(f"Description: {self.script.description}")
+            description = self._substitute_runtime_vars(self.script.description)
+            logger.info(f"Description: {description}")
 
         try:
             if not self.check_session_exists():
@@ -868,8 +926,10 @@ class RobotEngine:
                     f.write(error_pane_content.rstrip() + "\n\nError occurred\n")
                 logger.error(f"[Error Capture] Screen saved to {error_save_path}")
             except Exception as capture_e:
-                logger.warning(f"Failed to capture screen during error: {str(capture_e)}")
-            raise # Re-raise the original exception after capture
+                logger.warning(
+                    f"Failed to capture screen during error: {str(capture_e)}"
+                )
+            raise  # Re-raise the original exception after capture
 
         finally:
             self.terminate_session()
