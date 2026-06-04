@@ -57,10 +57,51 @@ class Action:
             data["if_true"] = [Action.from_dict(a) for a in if_true_raw]
             data["if_false"] = [Action.from_dict(a) for a in if_false_raw]
             return SearchAndCompareAction(**data)
+        elif action_type == "compare":
+            if_true_raw = data.pop("if_true", [])
+            if_false_raw = data.pop("if_false", [])
+            data["if_true"] = [Action.from_dict(a) for a in if_true_raw]
+            data["if_false"] = [Action.from_dict(a) for a in if_false_raw]
+            return CompareAction(**data)
         elif action_type == "terminate":
             return TerminateAction(**data)
         else:
             raise ValueError(f"Unknown action type: {action_type}")
+
+
+@dataclass
+class CompareAction(Action):
+    """Action to compare extracted screen text against an expected value.
+
+    Attributes:
+        expected: The value to compare against (supports {{VAR}} syntax).
+        operator: Comparison operator (EQ, NE, LE, LT, GE, GT, SAME, CONTAINS, NOT_SAME, NOT_CONTAINS).
+        row: Starting row for absolute extraction (1-indexed).
+        col: Starting column for absolute extraction (1-indexed).
+        length: Number of characters for absolute extraction.
+        search_text: Text to find for relative extraction.
+        end_row: Ending row for search area (1-indexed).
+        end_col: Ending column for search area (1-indexed).
+        extract_col: Column to extract from on the matching row.
+        extract_length: Number of characters to extract.
+        timeout_seconds: Maximum time to wait for search_text.
+        if_true: List of actions to execute if comparison is true.
+        if_false: List of actions to execute if comparison is false.
+    """
+
+    expected: str = ""
+    operator: str = "EQ"
+    row: Optional[int] = None
+    col: Optional[int] = None
+    length: Optional[int] = None
+    search_text: Optional[str] = None
+    end_row: Optional[int] = None
+    end_col: Optional[int] = None
+    extract_col: Optional[int] = None
+    extract_length: Optional[int] = None
+    timeout_seconds: int = 10
+    if_true: List[Action] = field(default_factory=list)
+    if_false: List[Action] = field(default_factory=list)
 
 
 @dataclass
