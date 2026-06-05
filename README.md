@@ -168,6 +168,49 @@ steps:
 **Coordinates**: 5250 coordinates are 1-indexed. Rows are 1-24 (80 col) or 1-27 (132 col).
 **Message Line**: Setting `is_message_line: true` in wait actions automatically targets the status line (line 24 or 27).
 
+## Examples
+
+### Compare Action
+
+#### Absolute Extraction
+Extract a value from a fixed position (Row 7, Col 35) and compare it against a literal value.
+
+```yaml
+  - type: "compare"
+    description: "Check if system security level is 40"
+    row: 7
+    col: 35
+    length: 2
+    expected: "40"
+    operator: "EQ"
+    if_true:
+      - type: "send_key"
+        key: "Enter"
+    if_false:
+      - type: "terminate"
+        reason: "Security level is not 40"
+```
+
+#### Relative Extraction
+Find a row containing "QSECURITY" and extract the value at Column 35. Compare it against an environment variable.
+
+```yaml
+  - type: "compare"
+    description: "Verify QSECURITY system value using relative search"
+    search_text: "QSECURITY"
+    row: 1
+    col: 1
+    end_row: 20
+    end_col: 80
+    extract_col: 35
+    extract_length: 2
+    expected: "{{SEC_QSECURITY}}"
+    operator: "EQ"
+    if_false:
+      - type: "terminate"
+        reason: "System security level does not match expected value"
+```
+
 ### Step 4: Run the Robot
 
 Execute the robot using the `run-robot.sh` script, providing the YAML file and the LPAR name via named arguments.
