@@ -1,0 +1,29 @@
+name: "Python & Project Structure"
+entries:
+  - name: "No src/ Restructure"
+    description: "Do not move Python code into a src/ layout. The robot_py/ directory is the correct and permanent location for all Python source."
+    pattern: "robot_py/**/*.py"
+
+  - name: "Python Formatting"
+    description: "All Python code in robot_py/**/*.py must pass 'ruff check' and 'black --check' targeting Python 3.12. Do not introduce mypy."
+    pattern: "robot_py/**/*.py"
+
+  - name: "Google-Style Docstrings"
+    description: "All Python functions and classes must have Google-style docstrings with Args:, Returns:, and Raises: sections where applicable."
+    pattern: "robot_py/**/*.py"
+
+  - name: "Test Mocking Strategy"
+    description: "Tests in tests/ must mock libtmux using unittest.mock or pytest-mock. Never write tests that require a live terminal session or real IBM i connection."
+    pattern: "tests/**/*.py"
+
+  - name: "No Poetry Migration"
+    description: "This project uses requirements.txt for dependency management. Do not migrate to Poetry or pyproject.toml-based tooling."
+    pattern: "**/*"
+
+  - name: "No Poetry python testing"
+    description: "Do nit use poetry for python testing."
+    pattern: "**/*"
+
+  - name: "Ignore ts_backup"
+    description: "The ts_backup/ directory contains archived TypeScript/React code. Do not edit or generate code there."
+    pattern: "ts_backup/**/*"
