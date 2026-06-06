@@ -124,11 +124,36 @@ log_message() {
 # --- Configuration Loading ---
 if [ -f "$ENV_FILE" ]; then
   log_message "Loading environment variables from $ENV_FILE"
-  # allexport ensures all variables in the sourced file are exported
-  set -o allexport
-  # shellcheck source=/dev/null
-  source "$ENV_FILE"
-  set +o allexport
+  # Manually parse the .env file instead of sourcing it to prevent code injection.
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Strip leading/trailing whitespace
+    line=$(echo "$line" | xargs)
+
+    # Skip comments and empty lines
+    [[ "$line" =~ ^#.*$ ]] && continue
+    [[ -z "$line" ]] && continue
+
+    # Remove 'export ' prefix if present
+    line="${line#export }"
+
+    # Extract key and value, ignoring inline comments
+    if [[ "$line" == *=* ]]; then
+      key="${line%%=*}"
+      # Strip potential trailing comment from the rest of the line
+      value_part="${line#*=}"
+      value="${value_part%% #*}"
+      # Trim whitespace from key and value
+      key=$(echo "$key" | xargs)
+      value=$(echo "$value" | xargs)
+      # Strip quotes from value
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+
+      export "$key=$value"
+    fi
+  done < "$ENV_FILE"
 else
   log_message "Error: Configuration file '$ENV_FILE' not found for LPAR '$LPAR_NAME'."
   exit 1
