@@ -18,6 +18,7 @@ from .schema import (
     SearchExtractAndSendAction,
     ExtractAtCursorAndSendAction,
     SearchAndCompareAction,
+    CompareAction,
     TerminateAction,
 )
 from .logger import logger
@@ -239,6 +240,74 @@ class RobotEngine:
             )
         else:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
+
+    def _perform_comparison(
+        self, actual: str, expected: str, operator: str, raw_expected: str = ""
+    ) -> bool:
+        """Perform a comparison between an extracted value and an expected value.
+
+        Supports numeric and string operators. Numeric operators (EQ, NE, LE, LT, GE, GT)
+        cast values to float. String operators are SAME, CONTAINS, NOT_SAME, NOT_CONTAINS.
+
+        Args:
+            actual: The value extracted from the screen.
+            expected: The value to compare against (substituted).
+            operator: The comparison operator.
+            raw_expected: The original expected value (unsubstituted, for error reporting).
+
+        Returns:
+            True if the comparison is successful, False otherwise.
+
+        Raises:
+            TerminationException: If numeric conversion fails for numeric operators.
+            ValueError: If an unknown operator is provided.
+        """
+        numeric_operators = ["EQ", "NE", "LE", "LT", "GE", "GT"]
+        string_operators = ["SAME", "CONTAINS", "NOT_SAME", "NOT_CONTAINS"]
+
+        if operator in numeric_operators:
+            try:
+                actual_num = float(actual)
+            except ValueError:
+                raise TerminationException(
+                    f"Compare data is incompatible: Extracted value '{actual}' is not numeric for operator {operator}"
+                )
+            try:
+                expected_num = float(expected)
+            except ValueError:
+                if "{{" in raw_expected:
+                    source = f"run time variable '{raw_expected}'"
+                else:
+                    source = f"expected value '{raw_expected}'" if raw_expected else "expected value"
+                raise TerminationException(
+                    f"Compare data is incompatible: The {source} resolved to '{expected}', which is not numeric for operator {operator}"
+                )
+
+            if operator == "EQ":
+                return actual_num == expected_num
+            elif operator == "NE":
+                return actual_num != expected_num
+            elif operator == "LE":
+                return actual_num <= expected_num
+            elif operator == "LT":
+                return actual_num < expected_num
+            elif operator == "GE":
+                return actual_num >= expected_num
+            elif operator == "GT":
+                return actual_num > expected_num
+        elif operator in string_operators:
+            if operator == "SAME":
+                return actual == expected
+            elif operator == "NOT_SAME":
+                return actual != expected
+            elif operator == "CONTAINS":
+                return expected in actual
+            elif operator == "NOT_CONTAINS":
+                return expected not in actual
+        else:
+            raise ValueError(f"Unknown comparison operator: {operator}")
+
+        return False
 
     def _substitute_runtime_vars(self, data: Any) -> Any:
         """Recursively substitute runtime variables in strings or lists.
@@ -821,6 +890,66 @@ class RobotEngine:
                 f'[CursorExtract] Extracted "{extracted}" from row {row}, col {col}'
             )
             self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
+        elif isinstance(step, CompareAction):
+            expected = self._substitute_runtime_vars(step.expected)
+            operator = step.operator
+            extracted = ""
+
+            if step.search_text:
+                # Relative extraction
+                search_text = self._substitute_runtime_vars(step.search_text)
+                found, last_content = self.wait_for_text_internal(
+                    search_text,
+                    step.timeout_seconds,
+                    step.row,
+                    step.col,
+                    step.end_row,
+                    step.end_col,
+                )
+                if not found:
+                    raise RuntimeError(
+                        f'Timeout waiting for "{search_text}" in block for CompareAction'
+                    )
+
+                match_row = self.find_text_in_block(
+                    last_content,
+                    search_text,
+                    step.row,
+                    step.col,
+                    step.end_row,
+                    step.end_col,
+                )
+                lines = last_content.splitlines()
+                extracted = lines[match_row - 1][
+                    step.extract_col - 1 : step.extract_col - 1 + step.extract_length
+                ].strip()
+            elif (
+                step.row is not None
+                and step.col is not None
+                and step.length is not None
+            ):
+                # Absolute extraction
+                last_content = self.capture_pane()
+                lines = last_content.splitlines()
+                self.validate_coords(step.row, step.col + step.length - 1)
+                extracted = lines[step.row - 1][
+                    step.col - 1 : step.col - 1 + step.length
+                ].strip()
+            else:
+                raise ValueError(
+                    "CompareAction must specify either search_text or row/col/length"
+                )
+
+            logger.info(
+                f"[Compare] Extracted '{extracted}', expected '{expected}' (operator: {operator})"
+            )
+
+            if self._perform_comparison(extracted, expected, operator, step.expected):
+                logger.info("[Compare] Comparison succeeded.")
+                self.execute_steps(step.if_true)
+            else:
+                logger.info("[Compare] Comparison failed.")
+                self.execute_steps(step.if_false)
         elif isinstance(step, SearchAndCompareAction):
             text = self._substitute_runtime_vars(step.text)
             found, last_content = self.wait_for_text_internal(
@@ -911,8 +1040,8 @@ class RobotEngine:
 
             logger.info("Automation complete!")
 
-        except TerminationException:
-            logger.info("Automation terminated as requested.")
+        except TerminationException as e:
+            logger.info(f"Automation terminated: {str(e)}")
         except Exception as e:
             logger.error(f"Error during automation: {str(e)}")
             try:

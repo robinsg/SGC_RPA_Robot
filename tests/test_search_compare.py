@@ -149,4 +149,4 @@ def test_engine_run_termination(engine):
          patch("robot_py.engine.logger.info") as mock_info:
 
         engine.run()
-        mock_info.assert_any_call("Automation terminated as requested.")
+        mock_info.assert_any_call("Automation terminated: Stop now")
