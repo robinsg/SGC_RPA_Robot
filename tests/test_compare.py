@@ -106,7 +106,7 @@ def test_compare_numeric_conversion_error_actual(engine):
     with patch.object(engine, "check_session_exists", return_value=True), \
          patch.object(engine, "capture_pane", return_value=pane_content):
 
-        with pytest.raises(TerminationException, match="Extracted value 'ABCDE' is not numeric"):
+        with pytest.raises(TerminationException, match="Compare data is incompatible: Extracted value 'ABCDE' is not numeric"):
             engine.execute_step(action)
 
 def test_compare_numeric_conversion_error_expected(engine):
@@ -122,7 +122,25 @@ def test_compare_numeric_conversion_error_expected(engine):
     with patch.object(engine, "check_session_exists", return_value=True), \
          patch.object(engine, "capture_pane", return_value=pane_content):
 
-        with pytest.raises(TerminationException, match="Expected value 'FORTY' is not numeric"):
+        with pytest.raises(TerminationException, match="Compare data is incompatible: The expected value 'FORTY' resolved to 'FORTY', which is not numeric"):
+            engine.execute_step(action)
+
+
+def test_compare_numeric_conversion_error_variable(engine):
+    engine.runtime_variables["SEC_LEVEL"] = "XX"
+    action = CompareAction(
+        type="compare",
+        expected="{{SEC_LEVEL}}",
+        operator="EQ",
+        row=1, col=1, length=2
+    )
+
+    pane_content = "40" + "\n" * 23
+
+    with patch.object(engine, "check_session_exists", return_value=True), \
+         patch.object(engine, "capture_pane", return_value=pane_content):
+
+        with pytest.raises(TerminationException, match="Compare data is incompatible: The expected value '{{SEC_LEVEL}}' resolved to 'XX', which is not numeric"):
             engine.execute_step(action)
 
 def test_compare_with_runtime_variable(engine):
