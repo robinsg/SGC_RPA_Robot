@@ -241,7 +241,9 @@ class RobotEngine:
         else:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
 
-    def _perform_comparison(self, actual: str, expected: str, operator: str) -> bool:
+    def _perform_comparison(
+        self, actual: str, expected: str, operator: str, raw_expected: str = ""
+    ) -> bool:
         """Perform a comparison between an extracted value and an expected value.
 
         Supports numeric and string operators. Numeric operators (EQ, NE, LE, LT, GE, GT)
@@ -249,8 +251,9 @@ class RobotEngine:
 
         Args:
             actual: The value extracted from the screen.
-            expected: The value to compare against.
+            expected: The value to compare against (substituted).
             operator: The comparison operator.
+            raw_expected: The original expected value (unsubstituted, for error reporting).
 
         Returns:
             True if the comparison is successful, False otherwise.
@@ -267,13 +270,14 @@ class RobotEngine:
                 actual_num = float(actual)
             except ValueError:
                 raise TerminationException(
-                    f"Comparison failed: Extracted value '{actual}' is not numeric for operator {operator}"
+                    f"Compare data is incompatible: Extracted value '{actual}' is not numeric for operator {operator}"
                 )
             try:
                 expected_num = float(expected)
             except ValueError:
+                source = f"expected value '{raw_expected}'" if raw_expected else "expected value"
                 raise TerminationException(
-                    f"Comparison failed: Expected value '{expected}' is not numeric for operator {operator}"
+                    f"Compare data is incompatible: The {source} resolved to '{expected}', which is not numeric for operator {operator}"
                 )
 
             if operator == "EQ":
@@ -937,7 +941,7 @@ class RobotEngine:
                 f"[Compare] Extracted '{extracted}', expected '{expected}' (operator: {operator})"
             )
 
-            if self._perform_comparison(extracted, expected, operator):
+            if self._perform_comparison(extracted, expected, operator, step.expected):
                 logger.info("[Compare] Comparison succeeded.")
                 self.execute_steps(step.if_true)
             else:
