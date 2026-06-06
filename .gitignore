@@ -36,7 +36,6 @@ captures/*
 # Non test yaml scripts
 *.yaml
 !example*.yaml
-!.cline/*.yaml
 
 # Backups
 ts_backup/
