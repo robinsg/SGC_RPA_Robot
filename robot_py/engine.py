@@ -275,7 +275,10 @@ class RobotEngine:
             try:
                 expected_num = float(expected)
             except ValueError:
-                source = f"expected value '{raw_expected}'" if raw_expected else "expected value"
+                if "{{" in raw_expected:
+                    source = f"run time variable '{raw_expected}'"
+                else:
+                    source = f"expected value '{raw_expected}'" if raw_expected else "expected value"
                 raise TerminationException(
                     f"Compare data is incompatible: The {source} resolved to '{expected}', which is not numeric for operator {operator}"
                 )
@@ -1037,8 +1040,8 @@ class RobotEngine:
 
             logger.info("Automation complete!")
 
-        except TerminationException:
-            logger.info("Automation terminated as requested.")
+        except TerminationException as e:
+            logger.info(f"Automation terminated: {str(e)}")
         except Exception as e:
             logger.error(f"Error during automation: {str(e)}")
             try:

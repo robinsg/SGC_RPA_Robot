@@ -140,8 +140,29 @@ def test_compare_numeric_conversion_error_variable(engine):
     with patch.object(engine, "check_session_exists", return_value=True), \
          patch.object(engine, "capture_pane", return_value=pane_content):
 
-        with pytest.raises(TerminationException, match="Compare data is incompatible: The expected value '{{SEC_LEVEL}}' resolved to 'XX', which is not numeric"):
+        with pytest.raises(TerminationException, match="Compare data is incompatible: The run time variable '{{SEC_LEVEL}}' resolved to 'XX', which is not numeric"):
             engine.execute_step(action)
+
+def test_engine_run_termination_logging(engine):
+    # Setup a CompareAction that will fail numeric conversion
+    engine.runtime_variables["SEC_LEVEL"] = "XX"
+    action = CompareAction(
+        type="compare",
+        expected="{{SEC_LEVEL}}",
+        operator="EQ",
+        row=1, col=1, length=2
+    )
+    engine.script.steps = [action]
+
+    with patch.object(engine, "check_session_exists", return_value=True), \
+         patch.object(engine, "capture_pane", return_value="40" + "\n" * 23), \
+         patch("robot_py.engine.logger.info") as mock_info:
+
+        engine.run()
+        # Verify that the specific termination message was logged in run()
+        expected_msg = "Automation terminated: Compare data is incompatible: The run time variable '{{SEC_LEVEL}}' resolved to 'XX', which is not numeric for operator EQ"
+        mock_info.assert_any_call(expected_msg)
+
 
 def test_compare_with_runtime_variable(engine):
     engine.runtime_variables["SEC_LEVEL"] = "40"

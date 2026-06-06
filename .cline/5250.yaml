@@ -1,3 +1,0 @@
-name: "5250 Coordinate System"
-description: "5250 coordinates are 1-indexed (Row 1-24/27, Col 1-80/132). Always verify coordinates against standard IBM i layouts when modifying or generating **/*.yaml files."
-pattern: "**/*.yaml"
