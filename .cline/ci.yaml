@@ -1,0 +1,13 @@
+name: "Shell scripts & CI"
+entries:
+  - name: "Shell Script Quality"
+    description: "All .sh files must pass shellcheck. Begin every shell script with 'set -euo pipefail'. Always quote variables using double quotes: \"$VAR\" not $VAR."
+    pattern: "**/*.sh"
+
+  - name: "No Hardcoded Secrets"
+    description: "Never hardcode credentials, hostnames, passwords, or API keys in Python or shell files. All secrets must be loaded from .env.<lpar> environment files which are git-ignored."
+    pattern: "**/*"
+
+  - name: "CI Compliance"
+    description: "All generated code must pass the GitHub Actions workflows: lint.yml (ruff, black, shellcheck), test.yml (pytest), security.yml (gitleaks, safety). Do not suggest commits that would fail CI."
+    pattern: "**/*"
