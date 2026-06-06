@@ -1,0 +1,14 @@
+name: "YAML Action Schema"
+description: "Valid actions for automation YAML. Always check robot_py/schema.py before adding new actions."
+pattern: "**/*.yaml"
+actions:
+  - wait_for_text
+  - send_text
+  - send_key
+  - sleep
+  - capture
+  - press_key_if_text_present
+  - move_cursor
+  - search_and_move_cursor
+  - search_extract_and_send
+  - extract_at_cursor_and_send
