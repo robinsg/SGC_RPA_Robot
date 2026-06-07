@@ -29,6 +29,9 @@ logs/*
 .env*
 !.env.example
 
+# Security Audit
+SECURITY_AUDIT.md
+
 # RPA Captures
 captures/*
 !captures/example/
