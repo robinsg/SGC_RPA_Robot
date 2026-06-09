@@ -25,7 +25,7 @@ class CustomFormatter(logging.Formatter):
     }
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format the log record with colours.
+        """Format the log record with colours and mask sensitive data.
 
         Args:
             record: The log record to format.
@@ -35,7 +35,16 @@ class CustomFormatter(logging.Formatter):
         """
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S.%3N")
-        return formatter.format(record)
+        formatted_message = formatter.format(record)
+
+        # Mask sensitive environment variables
+        sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
+        for var in sensitive_vars:
+            value = os.environ.get(var)
+            if value and value in formatted_message:
+                formatted_message = formatted_message.replace(value, "********")
+
+        return formatted_message
 
 
 def setup_logger() -> logging.Logger:
