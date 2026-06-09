@@ -69,12 +69,16 @@ Follow these steps to configure and run your first 5250 robot automation.
 
 The robot loads its configuration from environment files specific to the system (LPAR) you are targeting. Create a file named `.env.<lpar_name>` (e.g., `.env.pub400.com`) in the project root.
 
+#### Sensitive Data Masking
+
+To prevent sensitive information (like passwords) from appearing in the robot's logs, you can wrap the values in the `Secret()` keyword. The robot will extract the value for use but will replace it with `********` in any log output.
+
 **Example for Direct IP (`.env.pub400.com`):**
 
 ```env
 # Credentials
 TN5250_USER="YOUR_USERNAME"
-TN5250_PASSWORD="YOUR_PASSWORD"
+TN5250_PASSWORD=Secret("YOUR_PASSWORD")
 
 # Connection Settings
 TN5250_MAP="285"   # Keymap (e.g., 285 for UK, 37 for US)
@@ -94,12 +98,12 @@ TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
 ```env
 HMC_HOST="hmc.example.com"
 HMC_USER="hmc_admin"
-HMC_PWD="hmc_password"
+HMC_PWD=Secret("hmc_password")
 HMC_SYSNAME="MY_POWER_SYSTEM"
 HMC_LPARNAME="MY_LPAR"
 HMC_SESSION_KEY="session1" # Optional
 TN5250_USER="MY_USER"
-TN5250_PASSWORD="MY_PASSWORD"
+TN5250_PASSWORD=Secret("MY_PASSWORD")
 ```
 
 ### Step 3: Define the Automation Workflow
@@ -210,6 +214,25 @@ Find a row containing "QSECURITY" and extract the value at Column 35. Compare it
       - type: "terminate"
         reason: "System security level does not match expected value"
 ```
+
+### Sensitive Data Masking
+
+Using the `Secret()` keyword in your `.env` file ensures that passwords and other sensitive values are automatically masked in the robot's logs.
+
+**`.env.pub400.com`**:
+```env
+MY_APP_SECRET=Secret("very-secret-token")
+```
+
+**`yaml_scripts/my_automation.yaml`**:
+```yaml
+  - type: "send_text"
+    text: "${MY_APP_SECRET}"
+    description: "Sending secret token" # The log will show: Sending secret token
+                                       # and any echoed value in debug logs will be masked.
+```
+
+When the robot runs, any appearance of `"very-secret-token"` in the logs (both console and file) will be replaced with `********`.
 
 ### Step 4: Run the Robot
 
