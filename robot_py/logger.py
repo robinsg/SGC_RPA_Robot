@@ -38,7 +38,7 @@ class CustomFormatter(logging.Formatter):
         formatted_message = formatter.format(record)
 
         # Mask sensitive environment variables
-        sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD", "HMC_SESSION_KEY"]
+        sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
         for var in sensitive_vars:
             value = os.environ.get(var)
             if value and value in formatted_message:
