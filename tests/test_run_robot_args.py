@@ -101,3 +101,37 @@ def test_valid_args_but_missing_env(tmp_path):
     # It should fail because .env.test_host is missing
     assert result.returncode == 1
     assert "Error: Configuration file '.env.test_host' not found" in result.stdout or "Error: Configuration file '.env.test_host' not found" in result.stderr
+
+def test_env_arg_invalid_name():
+    result = run_script(["-f", "example_script.yaml", "-h", "test_host", "-e", "custom.env"])
+    assert result.returncode == 1
+    assert "Error: Environment file name must start with '.env'" in result.stderr
+
+def test_env_arg_not_found():
+    result = run_script(["-f", "example_script.yaml", "-h", "test_host", "-e", ".env.notfound"])
+    assert result.returncode == 1
+    assert "Error: Configuration file '.env.notfound' not found" in result.stdout or "Error: Configuration file '.env.notfound' not found" in result.stderr
+
+def test_env_arg_success(tmp_path):
+    yaml_file = tmp_path / "test.yaml"
+    yaml_file.write_text("name: test")
+    env_file = tmp_path / ".env.custom"
+    env_file.write_text("TN5250_USER=test\nTN5250_PASSWORD=test")
+
+    # Change CWD to tmp_path to run the script
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        script_path = os.path.join(original_cwd, "run-robot.sh")
+        # We use a non-existent host but provide a valid env file.
+        # It should try to load .env.custom instead of .env.wronghost
+        result = subprocess.run(
+            [script_path, "-f", "test.yaml", "-h", "wronghost", "-e", ".env.custom"],
+            capture_output=True,
+            text=True
+        )
+        # It should NOT fail with "Configuration file '.env.wronghost' not found"
+        assert "Error: Configuration file '.env.wronghost' not found" not in result.stdout
+        assert "Loading environment variables from .env.custom" in result.stdout
+    finally:
+        os.chdir(original_cwd)

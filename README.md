@@ -15,6 +15,9 @@ A simple, robust, and YAML-driven automation framework for IBM i (TN5250) system
 - **LPAR-Aware Captures**: Screen captures are automatically organized into folders named after the LPAR name with ISO timestamps.
   - On successful sign-off, the _previous_ distinct screen is captured with "Sign off successful" appended.
   - If the robot encounters an error, the screen at the time of the error is captured and saved as `error_screen_<timestamp>.txt`.
+- **LPAR-Aware Captures**: Screen captures are automatically organized into folders named after the LPAR name with ISO timestamps.
+  - On successful sign-off, the _previous_ distinct screen is captured with "Sign off successful" appended.
+  - If the robot encounters an error, the screen at the time of the error is captured and saved as `error_screen_<timestamp>.txt`.
 
 ## 🛠 Prerequisites
 
@@ -149,21 +152,69 @@ steps:
 
 ### Supported Actions
 
-| Action                       | Description                                                                                                                                                            | Key Parameters                                                                   |
-| :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- |
-| `wait_for_text`              | Waits for text to appear. Supports coordinates and block searches.                                                                                                     | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `timeout_seconds` |
-| `send_text`                  | Sends a string of text to the terminal.                                                                                                                                | `text`                                                                           |
-| `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`).                                                                                 | `key`                                                                            |
-| `sleep`                      | Pauses execution for a specified number of seconds.                                                                                                                    | `seconds`                                                                        |
-| `capture`                    | Saves a screen capture to the `captures/` directory. If the final screen is "Sign On", the previous distinct screen is captured and tagged with "Sign off successful". | `filename`                                                                       |
-| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                                                                                                             | `text`, `key`, `timeout_seconds`                                                 |
-| `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                                                                                                | `row`, `col`                                                                     |
-| `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.                                                                                         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                         |
-| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                                                                                                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`      |
-| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                                                                                                           | `length`                                                                         |
+| Action                       | Description                                                                                                                                                            | Key Parameters                                                                                                                              |
+| :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| `wait_for_text`              | Waits for text to appear. Supports coordinates and block searches.                                                                                                     | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `timeout_seconds`                                                            |
+| `send_text`                  | Sends a string of text to the terminal.                                                                                                                                | `text`                                                                                                                                      |
+| `send_key`                   | Sends a special terminal key (e.g., `Enter`, `F3`, `Reset`, `Tab`, `Page_up`, `Help`).                                                                                 | `key`                                                                                                                                       |
+| `sleep`                      | Pauses execution for a specified number of seconds.                                                                                                                    | `seconds`                                                                                                                                   |
+| `capture`                    | Saves a screen capture to the `captures/` directory. If the final screen is "Sign On", the previous distinct screen is captured and tagged with "Sign off successful". | `filename`                                                                                                                                  |
+| `press_key_if_text_present`  | Sends a key only if the specified text is found on screen.                                                                                                             | `text`, `key`, `timeout_seconds`                                                                                                            |
+| `move_cursor`                | Moves the terminal cursor to the specified coordinates.                                                                                                                | `row`, `col`                                                                                                                                |
+| `search_and_move_cursor`     | Finds text in a block and moves the cursor to a target column on the same row.                                                                                         | `text`, `row`, `col`, `end_row`, `end_col`, `target_col`                                                                                    |
+| `search_extract_and_send`    | Finds text in a block, extracts data from the same row, and sends it.                                                                                                  | `text`, `row`, `col`, `end_row`, `end_col`, `extract_col`, `extract_length`                                                                 |
+| `extract_at_cursor_and_send` | Extracts text from the current cursor position and sends it.                                                                                                           | `length`                                                                                                                                    |
+| `search_and_compare`         | Searches for text and executes conditional steps. Supports single/multiple search strings and Line, Positional, or Block checks.                                       | `text`, `row`, `col`, `end_row`, `end_col`, `is_message_line`, `if_true`, `if_false`                                                        |
+| `compare`                    | Extracts text from the screen and compares it against an expected value. Executes conditional steps based on the result. Supports absolute and relative extraction.    | `expected`, `operator`, `row`, `col`, `length`, `search_text`, `end_row`, `end_col`, `extract_col`, `extract_length`, `if_true`, `if_false` |
+| `terminate`                  | Immediately stops the robot's execution. Useful within `if_true` or `if_false` blocks.                                                                                 | `reason`                                                                                                                                    |
 
 **Coordinates**: 5250 coordinates are 1-indexed. Rows are 1-24 (80 col) or 1-27 (132 col).
 **Message Line**: Setting `is_message_line: true` in wait actions automatically targets the status line (line 24 or 27).
+
+## Examples
+
+### Compare Action
+
+#### Absolute Extraction
+
+Extract a value from a fixed position (Row 7, Col 35) and compare it against a literal value.
+
+```yaml
+- type: "compare"
+  description: "Check if system security level is 40"
+  row: 7
+  col: 35
+  length: 2
+  expected: "40"
+  operator: "EQ"
+  if_true:
+    - type: "send_key"
+      key: "Enter"
+  if_false:
+    - type: "terminate"
+      reason: "Security level is not 40"
+```
+
+#### Relative Extraction
+
+Find a row containing "QSECURITY" and extract the value at Column 35. Compare it against an environment variable.
+
+```yaml
+- type: "compare"
+  description: "Verify QSECURITY system value using relative search"
+  search_text: "QSECURITY"
+  row: 1
+  col: 1
+  end_row: 20
+  end_col: 80
+  extract_col: 35
+  extract_length: 2
+  expected: "{{SEC_QSECURITY}}"
+  operator: "EQ"
+  if_false:
+    - type: "terminate"
+      reason: "System security level does not match expected value"
+```
 
 ### Step 4: Run the Robot
 
@@ -176,6 +227,23 @@ If the robot script encounters an error (e.g., a timeout waiting for text), the 
 ```bash
 ./run-robot.sh --yaml-file my_automation.yaml --host pub400.com
 ```
+
+#### Custom Environment Files
+
+By default, the robot looks for a file named `.env.<host>` (e.g., `.env.pub400.com`). You can specify a custom environment file using the `-e` or `--env` flag.
+
+**Requirements for custom environment files:**
+
+- The filename **must** start with `.env` (e.g., `.env.production`, `.env.test.local`) to ensure it is ignored by git.
+- The file must contain valid `KEY=VALUE` pairs.
+
+```bash
+./run-robot.sh -f my_automation.yaml -h pub400.com -e .env.custom
+```
+
+### Error Captures
+
+If the robot script encounters an error (e.g., a timeout waiting for text), the screen content at the point of failure is automatically captured to `captures/<host>/error_screen_<timestamp>.txt`.
 
 #### Debug Mode
 

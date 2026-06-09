@@ -1,5 +1,5 @@
 # Python cache and compiled files
-robot_py/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -12,6 +12,7 @@ venv/
 .pytest_cache/
 coverage/
 htmlcov/
+nohup.out
 
 # Build and distribution
 build/
@@ -22,23 +23,30 @@ node_modules/
 .DS_Store
 
 # Log files
-*.log
+# Ignore all log files...
 logs/*
+# ...but not the captures directory itself, so we can create an exception within it.
+!logs/captures/
+
+# Captures
+captures/*
+!captures/example/
 
 # Environment variables
 .env*
 !.env.example
 
+# Security Audit
+SECURITY_AUDIT.md
+
 # RPA Captures
-captures/*
-!captures/example/
+logs/captures/*
+!logs/captures/example/
 
 # Non test yaml scripts
 *.yaml
 !example*.yaml
+!.cline/*.yaml
 
 # Backups
 ts_backup/
-
-# Testing
-nohup.out

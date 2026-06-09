@@ -3,9 +3,10 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union, Dict, Any
 from .schema import (
     parse_robot_script,
+    Action,
     SendTextAction,
     SendKeyAction,
     WaitForTextAction,
@@ -16,6 +17,9 @@ from .schema import (
     SearchAndMoveCursorAction,
     SearchExtractAndSendAction,
     ExtractAtCursorAndSendAction,
+    SearchAndCompareAction,
+    CompareAction,
+    TerminateAction,
 )
 from .logger import logger
 
@@ -113,6 +117,12 @@ def validate_environment():
         raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
 
 
+class TerminationException(Exception):
+    """Custom exception to signal that the robot should terminate immediately."""
+
+    pass
+
+
 class RobotEngine:
     """The core engine responsible for executing automation scripts.
 
@@ -162,7 +172,10 @@ class RobotEngine:
         self.host = os.environ.get("TN5250_HOST", "unknown_host")
         self.log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
         self.last_logged_title = ""
-        self.history_screens: List[str] = [] # Initialize screen history
+        self.history_screens: List[str] = []  # Initialize screen history
+        self.runtime_variables: Dict[str, str] = {
+            k: str(v) for k, v in os.environ.items()
+        }
 
         device_type = os.environ.get("TN5250_DEVICE_TYPE", "IBM-3477-FC")
         if device_type in SUPPORTED_27x132:
@@ -174,17 +187,25 @@ class RobotEngine:
         else:
             raise ValueError(f"Unsupported TN5250_DEVICE_TYPE: {device_type}")
 
-    def _get_screen_title(self, pane_content: str) -> str:
+    def _get_screen_title(
+        self, pane_content: str, current_rows: Optional[int] = None
+    ) -> str:
         """Extracts the screen title from the pane content.
 
         Args:
             pane_content: The raw text content of the pane.
+            current_rows: The current active row count to restrict title scanning to.
 
         Returns:
             The detected screen title, or an empty string if no title is found.
         """
         lines = pane_content.splitlines()
-        for line in lines[:5]:  # Only scan the first 5 lines for a title.
+        scan_limit = 5
+        if current_rows is not None:
+            scan_limit = min(5, current_rows)
+        for line in lines[
+            :scan_limit
+        ]:  # Only scan up to the first 5 or current_rows lines for a title.
             trimmed = line.strip()
             if trimmed:
                 return trimmed
@@ -237,6 +258,98 @@ class RobotEngine:
             )
         else:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
+
+    def _perform_comparison(
+        self, actual: str, expected: str, operator: str, raw_expected: str = ""
+    ) -> bool:
+        """Perform a comparison between an extracted value and an expected value.
+
+        Supports numeric and string operators. Numeric operators (EQ, NE, LE, LT, GE, GT)
+        cast values to float. String operators are SAME, CONTAINS, NOT_SAME, NOT_CONTAINS.
+
+        Args:
+            actual: The value extracted from the screen.
+            expected: The value to compare against (substituted).
+            operator: The comparison operator.
+            raw_expected: The original expected value (unsubstituted, for error reporting).
+
+        Returns:
+            True if the comparison is successful, False otherwise.
+
+        Raises:
+            TerminationException: If numeric conversion fails for numeric operators.
+            ValueError: If an unknown operator is provided.
+        """
+        numeric_operators = ["EQ", "NE", "LE", "LT", "GE", "GT"]
+        string_operators = ["SAME", "CONTAINS", "NOT_SAME", "NOT_CONTAINS"]
+
+        if operator in numeric_operators:
+            try:
+                actual_num = float(actual)
+            except ValueError:
+                raise TerminationException(
+                    f"Compare data is incompatible: Extracted value '{actual}' is not numeric for operator {operator}"
+                )
+            try:
+                expected_num = float(expected)
+            except ValueError:
+                if "{{" in raw_expected:
+                    source = f"run time variable '{raw_expected}'"
+                else:
+                    source = f"expected value '{raw_expected}'" if raw_expected else "expected value"
+                raise TerminationException(
+                    f"Compare data is incompatible: The {source} resolved to '{expected}', which is not numeric for operator {operator}"
+                )
+
+            if operator == "EQ":
+                return actual_num == expected_num
+            elif operator == "NE":
+                return actual_num != expected_num
+            elif operator == "LE":
+                return actual_num <= expected_num
+            elif operator == "LT":
+                return actual_num < expected_num
+            elif operator == "GE":
+                return actual_num >= expected_num
+            elif operator == "GT":
+                return actual_num > expected_num
+        elif operator in string_operators:
+            if operator == "SAME":
+                return actual == expected
+            elif operator == "NOT_SAME":
+                return actual != expected
+            elif operator == "CONTAINS":
+                return expected in actual
+            elif operator == "NOT_CONTAINS":
+                return expected not in actual
+        else:
+            raise ValueError(f"Unknown comparison operator: {operator}")
+
+        return False
+
+    def _substitute_runtime_vars(self, data: Any) -> Any:
+        """Recursively substitute runtime variables in strings or lists.
+
+        Supports {{VAR_NAME}}.
+
+        Args:
+            data: The data structure to process (str, list, or dict).
+
+        Returns:
+            The data structure with runtime variables substituted.
+        """
+        if isinstance(data, dict):
+            return {k: self._substitute_runtime_vars(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._substitute_runtime_vars(item) for item in data]
+        elif isinstance(data, str):
+
+            def replace_var(match):
+                var_name = match.group(1)
+                return self.runtime_variables.get(var_name, match.group(0))
+
+            return re.sub(r"\{\{(\w+)\}\}", replace_var, data)
+        return data
 
     def validate_coords(self, row: int, col: int):
         """Validate that the given coordinates are within terminal bounds.
@@ -310,6 +423,37 @@ class RobotEngine:
             for _ in range(-col_diff):
                 self.run_tmux(["send-keys", "-t", self.session, "Left"])
 
+    def _detect_current_screen_dimensions(self, pane_content: str) -> Tuple[int, int]:
+        """Detect current active screen dimensions based on 5250 status line.
+
+        For 27x132 capable devices, checks if the status line has '/' at col 76 on line 28 (DS4)
+        or line 25 (DS3). Defaults to 24x80 if not found or if the device is a 24x80 only device.
+
+        Args:
+            pane_content: The raw captured pane content.
+
+        Returns:
+            Tuple of (rows, cols) representing current mode.
+        """
+        if self.max_rows < 27:
+            return 24, 80
+
+        lines = pane_content.splitlines()
+
+        # Check line 28 (0-indexed 27) for 27x132 screen
+        if len(lines) >= 28:
+            line_28 = lines[27]
+            if len(line_28) >= 76 and line_28[75] == "/":
+                return 27, 132
+
+        # Check line 25 (0-indexed 24) for 24x80 screen
+        if len(lines) >= 25:
+            line_25 = lines[24]
+            if len(line_25) >= 76 and line_25[75] == "/":
+                return 24, 80
+
+        return 24, 80
+
     def capture_pane(self) -> str:
         """Capture the current content of the tmux pane.
 
@@ -318,8 +462,23 @@ class RobotEngine:
         Returns:
             The raw text content of the pane.
         """
-        pane_content = self.run_tmux(["capture-pane", "-t", self.session, "-p"])
-        new_title = self._get_screen_title(pane_content)
+        # Capture the entire possible buffer up to self.max_rows plus any extra status lines (e.g., 28 lines)
+        # To capture status line at row 28, we need 28 lines (indices 0 to 27)
+        max_capture_rows = 28 if self.max_rows == 27 else 25
+        pane_content = self.run_tmux(
+            [
+                "capture-pane",
+                "-t",
+                self.session,
+                "-p",
+                "-S",
+                "0",
+                "-E",
+                str(max_capture_rows - 1),
+            ]
+        )
+        current_rows, _ = self._detect_current_screen_dimensions(pane_content)
+        new_title = self._get_screen_title(pane_content, current_rows)
 
         if new_title and new_title != self.last_logged_title:
             logger.info(f"[Screen] {new_title}")
@@ -336,7 +495,7 @@ class RobotEngine:
     def find_text_in_buffer(
         self,
         pane_content: str,
-        text: str,
+        text: Union[str, List[str]],
         row: Optional[int] = None,
         col: Optional[int] = None,
         end_row: Optional[int] = None,
@@ -345,9 +504,11 @@ class RobotEngine:
     ) -> bool:
         """Search for text within a specific area of the pane content.
 
+        Supports searching for a single string or any string in a list.
+
         Args:
             pane_content: The raw text content of the pane.
-            text: The string to search for.
+            text: The string or list of strings to search for.
             row: Starting row (1-indexed).
             col: Starting column (1-indexed).
             end_row: Ending row (1-indexed).
@@ -355,12 +516,34 @@ class RobotEngine:
             is_message_line: If True, search only the message line.
 
         Returns:
-            True if the text was found, False otherwise.
+            True if any of the search strings were found, False otherwise.
         """
-        lines = pane_content.splitlines()
+        search_texts = [text] if isinstance(text, str) else text
+        for t in search_texts:
+            if self._find_single_text_in_buffer(
+                pane_content, t, row, col, end_row, end_col, is_message_line
+            ):
+                return True
+        return False
+
+    def _find_single_text_in_buffer(
+        self,
+        pane_content: str,
+        text: str,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        end_row: Optional[int] = None,
+        end_col: Optional[int] = None,
+        is_message_line: Optional[bool] = None,
+    ) -> bool:
+        """Helper to search for a single text string."""
+        current_rows, current_cols = self._detect_current_screen_dimensions(
+            pane_content
+        )
+        lines = pane_content.splitlines()[:current_rows]
 
         if is_message_line:
-            message_line_index = 26 if self.max_rows == 27 else 23
+            message_line_index = current_rows - 1
             line = lines[message_line_index] if len(lines) > message_line_index else ""
             return text in line
         elif (
@@ -370,21 +553,35 @@ class RobotEngine:
             and end_col is not None
         ):
             # Coordinates are 1-indexed in YAML
-            self.validate_block(row, col, end_row, end_col)
+            # Validate against dynamic screen dimensions to prevent reading beyond
+            if (
+                row > current_rows
+                or end_row > current_rows
+                or col > current_cols
+                or end_col > current_cols
+            ):
+                raise ValueError(
+                    f"Block coordinates ({row},{col}) to ({end_row},{end_col}) out of active bounds for {current_rows}x{current_cols} screen"
+                )
             search_area_lines = lines[row - 1 : end_row]
             search_area = "\n".join(
                 [line[col - 1 : end_col] for line in search_area_lines]
             )
             return text in search_area
         elif row is not None:
-            self.validate_coords(row, col or 1)
+            if row > current_rows or (col is not None and col > current_cols):
+                raise ValueError(
+                    f"Coordinates ({row},{col or 1}) out of active bounds for {current_rows}x{current_cols} screen"
+                )
             line = lines[row - 1] if len(lines) > row - 1 else ""
             if col is not None:
                 return text in line[col - 1 :]
             else:
                 return text in line
         else:
-            return text in pane_content
+            # For full buffer search, search only the actively displayed lines
+            trimmed_content = "\n".join(lines)
+            return text in trimmed_content
 
     def find_text_in_block(
         self,
@@ -420,7 +617,7 @@ class RobotEngine:
 
     def wait_for_text_internal(
         self,
-        text: str,
+        text: Union[str, List[str]],
         timeout: int,
         row: Optional[int] = None,
         col: Optional[int] = None,
@@ -516,15 +713,335 @@ class RobotEngine:
         except Exception as e:
             logger.warning(f"[Debug Capture] Failed to capture screen: {str(e)}")
 
+    def execute_steps(self, steps: List[Action]):
+        """Execute a sequence of automation steps.
+
+        Args:
+            steps: List of Action objects to execute.
+        """
+        for i, step in enumerate(steps):
+            description = self._substitute_runtime_vars(step.description)
+            desc = f" ({description})" if description else ""
+            logger.info(f"[Step {i + 1}/{len(steps)}] {step.type}{desc}")
+            self.execute_step(step)
+            self.capture_pane()
+
+    def execute_step(self, step: Action):
+        """Execute a single automation step.
+
+        Args:
+            step: The Action object to perform.
+        """
+        if isinstance(step, SendTextAction):
+            text = self._substitute_runtime_vars(step.text)
+            self.run_tmux(["send-keys", "-l", "-t", self.session, text])
+        elif isinstance(step, SendKeyAction):
+            key = self._substitute_runtime_vars(step.key)
+            key_to_send = KEY_MAP.get(key, key)
+            logger.debug(f"[Key Send] Sending key: '{key}' -> tmux: '{key_to_send}'")
+
+            if self.log_level == "DEBUG":
+                before = self.capture_pane()
+                logger.debug(
+                    f"\n--- Before {key} ---\n{before}\n--- End Before {key} ---"
+                )
+
+            self.run_tmux(["send-keys", "-t", self.session, key_to_send])
+            time.sleep(0.25)
+
+            if self.log_level == "DEBUG":
+                after = self.capture_pane()
+                logger.debug(f"\n--- After {key} ---\n{after}\n--- End After {key} ---")
+
+            self.capture_debug_screen(f"after_send_key_{key}")
+        elif isinstance(step, SleepAction):
+            time.sleep(step.seconds)
+        elif isinstance(step, CaptureAction):
+            current_screen_content = self.capture_pane()
+            timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+            host_dir = os.path.join(os.getcwd(), "captures", self.host)
+            os.makedirs(host_dir, exist_ok=True)
+
+            filename = self._substitute_runtime_vars(step.filename)
+            base_name = filename or "capture"
+
+            if "Sign On" in current_screen_content:
+                # Find the last but one screen from history
+                prev_screen_content = ""
+                for i in range(len(self.history_screens) - 2, -1, -1):
+                    if self._get_screen_title(
+                        self.history_screens[i]
+                    ) != self._get_screen_title(current_screen_content):
+                        prev_screen_content = self.history_screens[i]
+                        break
+
+                if prev_screen_content:
+                    capture_content = (
+                        prev_screen_content.rstrip() + "\n\nSign off successful\n"
+                    )
+                    final_filename = f"{base_name}_signoff_success_{timestamp}.txt"
+                else:
+                    # Fallback if no distinct previous screen found, but still sign on
+                    capture_content = (
+                        current_screen_content.rstrip() + "\n\nSign off successful\n"
+                    )
+                    final_filename = (
+                        f"{base_name}_signoff_success_fallback_{timestamp}.txt"
+                    )
+            else:
+                capture_content = current_screen_content
+                final_filename = f"{base_name}_{timestamp}.txt"
+
+            save_path = os.path.join(host_dir, final_filename)
+
+            with open(save_path, "w") as f:
+                f.write(capture_content)
+            logger.info(f"[Capture] Saved to {save_path}")
+        elif isinstance(step, WaitForTextAction):
+            text = self._substitute_runtime_vars(step.text)
+            self.wait_for_text(
+                text,
+                step.timeout_seconds,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+                step.is_message_line,
+            )
+            safe_text = "".join([c if c.isalnum() else "_" for c in text])
+            self.capture_debug_screen(f"after_wait_for_{safe_text}")
+        elif isinstance(step, PressKeyIfTextPresentAction):
+            settle_time = step.wait_ms / 1000.0 if step.wait_ms is not None else 0.25
+            if settle_time > 0:
+                time.sleep(settle_time)
+
+            text = self._substitute_runtime_vars(step.text)
+            key = self._substitute_runtime_vars(step.key)
+            found, last_content = self.wait_for_text_internal(
+                text,
+                step.timeout_seconds,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+                step.is_message_line,
+            )
+
+            if found:
+                press_key = KEY_MAP.get(key, key)
+                logger.info(
+                    f'[Condition] Text "{text}" found. Sending key: {key} -> tmux: {press_key}'
+                )
+                self.run_tmux(["send-keys", "-t", self.session, press_key])
+                time.sleep(0.25)
+            else:
+                logger.info(
+                    f'[Condition] Text "{text}" not found after {step.timeout_seconds}s. Skipping.'
+                )
+        elif isinstance(step, MoveCursorAction):
+            logger.info(f"[Cursor] Moving to row {step.row}, col {step.col}")
+            self.move_cursor(step.row, step.col)
+        elif isinstance(step, SearchAndMoveCursorAction):
+            text = self._substitute_runtime_vars(step.text)
+            found, last_content = self.wait_for_text_internal(
+                text,
+                step.timeout_seconds,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+            )
+            if not found:
+                raise RuntimeError(
+                    f'Timeout waiting for "{text}" in block for SearchAndMoveCursorAction'
+                )
+
+            match_row = self.find_text_in_block(
+                last_content,
+                text,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+            )
+            logger.info(
+                f'[SearchMove] Found "{text}" at row {match_row}. Moving cursor to col {step.target_col}'
+            )
+            self.move_cursor(match_row, step.target_col)
+        elif isinstance(step, SearchExtractAndSendAction):
+            text = self._substitute_runtime_vars(step.text)
+            found, last_content = self.wait_for_text_internal(
+                text,
+                step.timeout_seconds,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+            )
+            if not found:
+                raise RuntimeError(
+                    f'Timeout waiting for "{text}" in block for SearchExtractAndSendAction'
+                )
+
+            match_row = self.find_text_in_block(
+                last_content,
+                text,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+            )
+            lines = last_content.splitlines()
+            extracted = lines[match_row - 1][
+                step.extract_col - 1 : step.extract_col - 1 + step.extract_length
+            ].strip()
+            logger.info(
+                f'[SearchExtract] Found "{text}" at row {match_row}. Extracted "{extracted}" from col {step.extract_col}'
+            )
+            self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
+        elif isinstance(step, ExtractAtCursorAndSendAction):
+            row, col = self.get_cursor_position()
+            last_content = self.capture_pane()
+            lines = last_content.splitlines()
+            extracted = lines[row - 1][col - 1 : col - 1 + step.length].strip()
+            logger.info(
+                f'[CursorExtract] Extracted "{extracted}" from row {row}, col {col}'
+            )
+            self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
+        elif isinstance(step, CompareAction):
+            expected = self._substitute_runtime_vars(step.expected)
+            operator = step.operator
+            extracted = ""
+
+            if step.search_text:
+                # Relative extraction
+                search_text = self._substitute_runtime_vars(step.search_text)
+                found, last_content = self.wait_for_text_internal(
+                    search_text,
+                    step.timeout_seconds,
+                    step.row,
+                    step.col,
+                    step.end_row,
+                    step.end_col,
+                )
+                if not found:
+                    raise RuntimeError(
+                        f'Timeout waiting for "{search_text}" in block for CompareAction'
+                    )
+
+                match_row = self.find_text_in_block(
+                    last_content,
+                    search_text,
+                    step.row,
+                    step.col,
+                    step.end_row,
+                    step.end_col,
+                )
+                lines = last_content.splitlines()
+                extracted = lines[match_row - 1][
+                    step.extract_col - 1 : step.extract_col - 1 + step.extract_length
+                ].strip()
+            elif (
+                step.row is not None
+                and step.col is not None
+                and step.length is not None
+            ):
+                # Absolute extraction
+                last_content = self.capture_pane()
+                lines = last_content.splitlines()
+                self.validate_coords(step.row, step.col + step.length - 1)
+                extracted = lines[step.row - 1][
+                    step.col - 1 : step.col - 1 + step.length
+                ].strip()
+            else:
+                raise ValueError(
+                    "CompareAction must specify either search_text or row/col/length"
+                )
+
+            logger.info(
+                f"[Compare] Extracted '{extracted}', expected '{expected}' (operator: {operator})"
+            )
+
+            if self._perform_comparison(extracted, expected, operator, step.expected):
+                logger.info("[Compare] Comparison succeeded.")
+                self.execute_steps(step.if_true)
+            else:
+                logger.info("[Compare] Comparison failed.")
+                self.execute_steps(step.if_false)
+        elif isinstance(step, SearchAndCompareAction):
+            text = self._substitute_runtime_vars(step.text)
+            found, last_content = self.wait_for_text_internal(
+                text,
+                step.timeout_seconds,
+                step.row,
+                step.col,
+                step.end_row,
+                step.end_col,
+                step.is_message_line,
+            )
+
+            if found:
+                logger.info(f'[Compare] Search for "{text}" succeeded.')
+                self.execute_steps(step.if_true)
+            else:
+                logger.info(f'[Compare] Search for "{text}" failed.')
+
+                # Check if it was a line or positional check to report actual value
+                # (either row is set, or is_message_line is set)
+                is_block = (
+                    step.row is not None
+                    and step.col is not None
+                    and step.end_row is not None
+                    and step.end_col is not None
+                )
+
+                if not is_block:
+                    lines = last_content.splitlines()
+                    actual_value = ""
+                    search_texts = (
+                        [text] if isinstance(text, str) else text
+                    )
+                    max_len = max((len(t) for t in search_texts), default=0)
+
+                    if step.is_message_line:
+                        message_line_index = 26 if self.max_rows == 27 else 23
+                        actual_value = (
+                            lines[message_line_index]
+                            if len(lines) > message_line_index
+                            else ""
+                        )
+                    elif step.row is not None and step.col is not None:
+                        # Positional check
+                        if 1 <= step.row <= len(lines):
+                            line = lines[step.row - 1]
+                            actual_value = line[step.col - 1 : step.col - 1 + max_len]
+                    elif step.row is not None:
+                        # Line check
+                        if 1 <= step.row <= len(lines):
+                            actual_value = lines[step.row - 1]
+
+                    msg = f'Search for text failed to find "{text}". Actual value found: "{actual_value}".'
+                    logger.info(msg)
+                    print(msg)
+
+                self.execute_steps(step.if_false)
+        elif isinstance(step, TerminateAction):
+            reason = self._substitute_runtime_vars(step.reason)
+            reason_str = f" Reason: {reason}" if reason else ""
+            logger.info(f"[Terminate] Robot terminating.{reason_str}")
+            raise TerminationException(reason)
+
     def run(self):
         """Execute all steps defined in the robot script.
 
         Iterates through the steps in self.script.steps and performs
         the corresponding actions.
         """
-        logger.info(f"Starting Robot: {self.script.name}")
+        name = self._substitute_runtime_vars(self.script.name)
+        logger.info(f"Starting Robot: {name}")
         if self.script.description:
-            logger.info(f"Description: {self.script.description}")
+            description = self._substitute_runtime_vars(self.script.description)
+            logger.info(f"Description: {description}")
 
         try:
             if not self.check_session_exists():
@@ -537,186 +1054,12 @@ class RobotEngine:
             initial_pane_content = self.capture_pane()
             self.history_screens.append(initial_pane_content)
 
-            for i, step in enumerate(self.script.steps):
-                desc = f" ({step.description})" if step.description else ""
-                logger.info(
-                    f"[Step {i + 1}/{len(self.script.steps)}] {step.type}{desc}"
-                )
-
-                if isinstance(step, SendTextAction):
-                    self.run_tmux(["send-keys", "-l", "-t", self.session, step.text])
-                elif isinstance(step, SendKeyAction):
-                    key_to_send = KEY_MAP.get(step.key, step.key)
-                    logger.debug(
-                        f"[Key Send] Sending key: '{step.key}' -> tmux: '{key_to_send}'"
-                    )
-
-                    if self.log_level == "DEBUG":
-                        before = self.capture_pane()
-                        logger.debug(
-                            f"\n--- Before {step.key} ---\n{before}\n--- End Before {step.key} ---"
-                        )
-
-                    self.run_tmux(["send-keys", "-t", self.session, key_to_send])
-                    time.sleep(0.25)
-
-                    if self.log_level == "DEBUG":
-                        after = self.capture_pane()
-                        logger.debug(
-                            f"\n--- After {step.key} ---\n{after}\n--- End After {step.key} ---"
-                        )
-
-                    self.capture_debug_screen(f"after_send_key_{step.key}")
-                elif isinstance(step, SleepAction):
-                    time.sleep(step.seconds)
-                elif isinstance(step, CaptureAction):
-                    current_screen_content = self.capture_pane()
-                    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-                    host_dir = os.path.join(os.getcwd(), "captures", self.host)
-                    os.makedirs(host_dir, exist_ok=True)
-
-                    base_name = step.filename or "capture"
-
-                    if "Sign On" in current_screen_content:
-                        # Find the last but one screen from history
-                        prev_screen_content = ""
-                        for i in range(len(self.history_screens) - 2, -1, -1):
-                            if self._get_screen_title(self.history_screens[i]) != self._get_screen_title(current_screen_content):
-                                prev_screen_content = self.history_screens[i]
-                                break
-                        
-                        if prev_screen_content:
-                            capture_content = prev_screen_content.rstrip() + "\n\nSign off successful\n"
-                            final_filename = f"{base_name}_signoff_success_{timestamp}.txt"
-                        else:
-                            # Fallback if no distinct previous screen found, but still sign on
-                            capture_content = current_screen_content.rstrip() + "\n\nSign off successful\n"
-                            final_filename = f"{base_name}_signoff_success_fallback_{timestamp}.txt"
-                    else:
-                        capture_content = current_screen_content
-                        final_filename = f"{base_name}_{timestamp}.txt"
-                    
-                    save_path = os.path.join(host_dir, final_filename)
-
-                    with open(save_path, "w") as f:
-                        f.write(capture_content)
-                    logger.info(f"[Capture] Saved to {save_path}")
-                elif isinstance(step, WaitForTextAction):
-                    self.wait_for_text(
-                        step.text,
-                        step.timeout_seconds,
-                        step.row,
-                        step.col,
-                        step.end_row,
-                        step.end_col,
-                        step.is_message_line,
-                    )
-                    safe_text = "".join([c if c.isalnum() else "_" for c in step.text])
-                    self.capture_debug_screen(f"after_wait_for_{safe_text}")
-                elif isinstance(step, PressKeyIfTextPresentAction):
-                    settle_time = (
-                        step.wait_ms / 1000.0 if step.wait_ms is not None else 0.25
-                    )
-                    if settle_time > 0:
-                        time.sleep(settle_time)
-
-                    found, last_content = self.wait_for_text_internal(
-                        step.text,
-                        step.timeout_seconds,
-                        step.row,
-                        step.col,
-                        step.end_row,
-                        step.end_col,
-                        step.is_message_line,
-                    )
-
-                    if found:
-                        press_key = KEY_MAP.get(step.key, step.key)
-                        logger.info(
-                            f'[Condition] Text "{step.text}" found. Sending key: {step.key} -> tmux: {press_key}'
-                        )
-                        self.run_tmux(["send-keys", "-t", self.session, press_key])
-                        time.sleep(0.25)
-                    else:
-                        logger.info(
-                            f'[Condition] Text "{step.text}" not found after {step.timeout_seconds}s. Skipping.'
-                        )
-                elif isinstance(step, MoveCursorAction):
-                    logger.info(f"[Cursor] Moving to row {step.row}, col {step.col}")
-                    self.move_cursor(step.row, step.col)
-                elif isinstance(step, SearchAndMoveCursorAction):
-                    found, last_content = self.wait_for_text_internal(
-                        step.text,
-                        step.timeout_seconds,
-                        step.row,
-                        step.col,
-                        step.end_row,
-                        step.end_col,
-                    )
-                    if not found:
-                        raise RuntimeError(
-                            f'Timeout waiting for "{step.text}" in block for SearchAndMoveCursorAction'
-                        )
-
-                    match_row = self.find_text_in_block(
-                        last_content,
-                        step.text,
-                        step.row,
-                        step.col,
-                        step.end_row,
-                        step.end_col,
-                    )
-                    logger.info(
-                        f'[SearchMove] Found "{step.text}" at row {match_row}. Moving cursor to col {step.target_col}'
-                    )
-                    self.move_cursor(match_row, step.target_col)
-                elif isinstance(step, SearchExtractAndSendAction):
-                    found, last_content = self.wait_for_text_internal(
-                        step.text,
-                        step.timeout_seconds,
-                        step.row,
-                        step.col,
-                        step.end_row,
-                        step.end_col,
-                    )
-                    if not found:
-                        raise RuntimeError(
-                            f'Timeout waiting for "{step.text}" in block for SearchExtractAndSendAction'
-                        )
-
-                    match_row = self.find_text_in_block(
-                        last_content,
-                        step.text,
-                        step.row,
-                        step.col,
-                        step.end_row,
-                        step.end_col,
-                    )
-                    lines = last_content.splitlines()
-                    extracted = lines[match_row - 1][
-                        step.extract_col
-                        - 1 : step.extract_col
-                        - 1
-                        + step.extract_length
-                    ].strip()
-                    logger.info(
-                        f'[SearchExtract] Found "{step.text}" at row {match_row}. Extracted "{extracted}" from col {step.extract_col}'
-                    )
-                    self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
-                elif isinstance(step, ExtractAtCursorAndSendAction):
-                    row, col = self.get_cursor_position()
-                    last_content = self.capture_pane()
-                    lines = last_content.splitlines()
-                    extracted = lines[row - 1][col - 1 : col - 1 + step.length].strip()
-                    logger.info(
-                        f'[CursorExtract] Extracted "{extracted}" from row {row}, col {col}'
-                    )
-                    self.run_tmux(["send-keys", "-l", "-t", self.session, extracted])
-
-                self.capture_pane()
+            self.execute_steps(self.script.steps)
 
             logger.info("Automation complete!")
 
+        except TerminationException as e:
+            logger.info(f"Automation terminated: {str(e)}")
         except Exception as e:
             logger.error(f"Error during automation: {str(e)}")
             try:
@@ -730,8 +1073,10 @@ class RobotEngine:
                     f.write(error_pane_content.rstrip() + "\n\nError occurred\n")
                 logger.error(f"[Error Capture] Screen saved to {error_save_path}")
             except Exception as capture_e:
-                logger.warning(f"Failed to capture screen during error: {str(capture_e)}")
-            raise # Re-raise the original exception after capture
+                logger.warning(
+                    f"Failed to capture screen during error: {str(capture_e)}"
+                )
+            raise  # Re-raise the original exception after capture
 
         finally:
             self.terminate_session()
