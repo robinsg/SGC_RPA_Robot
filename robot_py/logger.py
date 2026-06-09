@@ -39,6 +39,12 @@ class CustomFormatter(logging.Formatter):
 
         # Mask sensitive environment variables
         sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
+        custom_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
+        if custom_sensitive:
+            sensitive_vars.extend(
+                [v.strip() for v in custom_sensitive.split(",") if v.strip()]
+            )
+
         for var in sensitive_vars:
             value = os.environ.get(var)
             if value and value in formatted_message:

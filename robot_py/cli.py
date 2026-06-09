@@ -30,9 +30,26 @@ def load_env_file(filepath: str):
 
             if "=" in line:
                 key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+
+                # Handle Secret() keyword
+                if value.startswith("Secret(") and value.endswith(")"):
+                    value = value[7:-1].strip()
+                    # Add to ROBOT_SENSITIVE_VARS
+                    current_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
+                    if current_sensitive:
+                        sensitive_list = current_sensitive.split(",")
+                        if key not in sensitive_list:
+                            os.environ["ROBOT_SENSITIVE_VARS"] = (
+                                f"{current_sensitive},{key}"
+                            )
+                    else:
+                        os.environ["ROBOT_SENSITIVE_VARS"] = key
+
                 # Remove optional quotes from the value
-                value = value.strip().strip("\"'")
-                os.environ[key.strip()] = value
+                value = value.strip("\"'")
+                os.environ[key] = value
 
 
 def main():

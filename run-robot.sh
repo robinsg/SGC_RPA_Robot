@@ -145,6 +145,24 @@ if [ -f "$ENV_FILE" ]; then
       # Trim whitespace from key and value
       key=$(echo "$key" | xargs)
       value=$(echo "$value" | xargs)
+      # Handle Secret() keyword
+      if [[ "$value" == Secret\(*\) ]]; then
+        # Extract content between parentheses
+        secret_content="${value#Secret(}"
+        secret_content="${secret_content%)}"
+        value=$(echo "$secret_content" | xargs)
+
+        # Add to ROBOT_SENSITIVE_VARS
+        if [ -z "${ROBOT_SENSITIVE_VARS:-}" ]; then
+          export ROBOT_SENSITIVE_VARS="$key"
+        else
+          # Avoid duplicates
+          if [[ ! ",$ROBOT_SENSITIVE_VARS," == *",$key,"* ]]; then
+            export ROBOT_SENSITIVE_VARS="$ROBOT_SENSITIVE_VARS,$key"
+          fi
+        fi
+      fi
+
       # Strip quotes from value
       value="${value%\"}"
       value="${value#\"}"
