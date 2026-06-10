@@ -82,7 +82,7 @@ TN5250_PASSWORD=Secret("YOUR_PASSWORD")
 
 # Connection Settings
 TN5250_MAP="285"   # Keymap (e.g., 285 for UK, 37 for US)
-TN5250_SSL="on"    # "on" or "off"
+TN5250_SSL="on"    # "on" or "off" (SSL should be the default for direct IP connections. Connections via HMC are always SSL.)
 TN5250_PORT=992    # Optional: defaults to 992 for SSL, 23 for non-SSL
 
 # Supported Terminal Types:
@@ -92,6 +92,17 @@ TN5250_DEVICE_TYPE="IBM-3477-FC"
 
 TN5250_DEVICE_NAME="ROBOT01" # Optional: Virtual station name
 ```
+
+#### Minimum Set of Permissions
+
+To ensure the robot operates with appropriate security, the IBM i user profile it uses should adhere to the principle of least privilege. This means granting only the necessary permissions for the robot to perform its automated tasks.
+
+- The IBM i user profile should have `*USER` class.
+- Limit capabilities with `LMTCPB(*YES)` if the robot only needs to run specific commands.
+- Use specific `GRTOBJAUT` commands to grant access only to the libraries, files, and programs required for automation.
+- Avoid `*ALLOBJ` or `*SECADM` special authorities unless strictly necessary.
+
+````
 
 **Example for HMC Proxy:**
 
@@ -104,7 +115,7 @@ HMC_LPARNAME="MY_LPAR"
 HMC_SESSION_KEY=Secret("my_session_key")
 TN5250_USER="MY_USER"
 TN5250_PASSWORD=Secret("MY_PASSWORD")
-```
+````
 
 ### Step 3: Define the Automation Workflow
 
@@ -255,6 +266,72 @@ By default, the robot looks for a file named `.env.<host>` (e.g., `.env.pub400.c
 
 - The filename **must** start with `.env` (e.g., `.env.production`, `.env.test.local`) to ensure it is ignored by git.
 - The file must contain valid `KEY=VALUE` pairs.
+
+### Environment Security
+
+To further secure the robot's execution environment, follow these recommendations:
+
+1. **Run under a Dedicated Service Account**:
+
+   It is recommended to create a dedicated, unprivileged service account for running the robot. This limits the potential damage if the robot or its environment is compromised.
+
+   ```bash
+   sudo useradd --system --no-create-home --shell /bin/false robot_user
+   sudo mkdir /opt/SGC_RPA_Robot
+   sudo chown robot_user:robot_user /opt/SGC_RPA_Robot
+   # Example: To run the robot as this user (assuming your script is in /opt/SGC_RPA_Robot)
+   # sudo -u robot_user /opt/robot_user/run-robot.sh ...
+   ```
+
+2. **Set Strict File Permissions on Project Directory**:
+
+   Restrict access to the robot's project directory to prevent unauthorized reading or modification.
+
+   ```bash
+   chmod 700 /opt/SGC_RPA_Robot # Adjust path as necessary
+   ```
+
+3. **Ensure `.env` Files are Secure**:
+
+   Environment files containing sensitive information should have very strict permissions.
+
+   ```bash
+   chmod 600 /opt/SGC_RPA_Robot/.env.<lpar_name> # Adjust path and filename
+   ```
+
+#### Transport Security: Certificate Checking with `tn5250`
+
+To prevent Man-in-the-Middle (MITM) attacks, it is highly recommended to use certificate checking with `tn5250` when connecting via SSL. This ensures that the robot is communicating with a trusted IBM i host.
+
+**Importing Self-Signed CA and Server Certificates**:
+
+If your IBM i system uses self-signed certificates or certificates issued by an internal Certificate Authority (CA), you need to import these certificates into the system's trust store where `tn5250` can access them. The exact method depends on your operating system, but typically involves:
+
+1.  **Obtain the Certificates**:
+    Get the CA certificate (if applicable) and the server certificate from your IBM i system administrator.
+
+2.  **Convert to PEM Format (if necessary)**:
+    `tn5250` typically expects certificates in PEM format. If your certificates are in DER or PFX format, you may need to convert them using `openssl`.
+
+    ```bash
+    # Example: Convert DER to PEM
+    openssl x509 -inform DER -in certificate.cer -out certificate.pem
+    ```
+
+3.  **Place Certificates in a Trusted Location**:
+    Common locations include `/etc/ssl/certs/` or a custom directory. Ensure the `tn5250` client is configured to look in these locations.
+
+4.  **Configure `tn5250` for Certificate Checking**:
+    You might need to set environment variables or `tn5250` configuration options to enable certificate validation. Consult the `tn5250` documentation for specifics, but generally, `tn5250` uses the system's default certificate store or paths specified by `SSL_CERT_FILE` or `SSL_CERT_DIR`.
+
+    ```bash
+    # Example: Set environment variables before running the robot
+    export SSL_CERT_FILE="/path/to/your/ca-bundle.pem"
+    export TN5250_SSL_VERIFY_SERVER_CERT=on
+    ./run-robot.sh ...
+    ```
+
+    Ensure that `TN5250_SSL="on"` is always set in your `.env` file when using certificate checking.
 
 ```bash
 ./run-robot.sh -f my_automation.yaml -h pub400.com -e .env.custom
