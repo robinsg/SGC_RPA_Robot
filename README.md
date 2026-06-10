@@ -337,6 +337,35 @@ If your IBM i system uses self-signed certificates or certificates issued by an 
 ./run-robot.sh -f my_automation.yaml -h pub400.com -e .env.custom
 ```
 
+### CI/CD with Self-Hosted GitHub Runner
+
+This project supports execution on self-hosted GitHub runners for secure, internal IBM i environments.
+
+#### Configuration
+
+To maintain security, environment-specific details are kept outside of version control in a JSON configuration file on the runner.
+
+1. **Location**: `/home/github-runner/customer_config.json`
+2. **Format**:
+   ```json
+   {
+     "a-hmc": {
+       "yaml_file": "ops_hmc.yaml",
+       "host": "eur400a",
+       "env_file": ".env.eur400a_hmc"
+     },
+     "t-direct": {
+       "yaml_file": "verify_system_integrity_conditional.yaml",
+       "host": "eur400t",
+       "env_file": ".env.eur400t_direct"
+     }
+   }
+   ```
+
+#### Workflow
+
+The workflow `.github/workflows/self-hosted-tests.yml` uses a matrix strategy to loop through generic keys (e.g., `a-hmc`, `t-direct`). These keys are passed to `tests/run_github_robot.sh`, which resolves the actual LPAR details from the local JSON file.
+
 ### Error Captures
 
 If the robot script encounters an error (e.g., a timeout waiting for text), the screen content at the point of failure is automatically captured to `captures/<host>/error_screen_<timestamp>.txt`.
@@ -358,6 +387,6 @@ Debug captures are stored in `logs/captures/<host>/`.
 - `yaml_scripts/`: Directory containing all YAML automation scripts and common components.
 - `captures/`: Host-specific screen captures.
 - `logs/`: Application logs and debug captures.
-- `tests/`: Automated test suite for the engine and schema validation.
+- `tests/`: Automated test suite for the engine and schema validation, including the GitHub Actions orchestrator.
 - `requirements.txt`: Python dependency list.
 - `.env.<lpar>`: (Untracked) LPAR-specific configuration.

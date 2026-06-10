@@ -1,0 +1,39 @@
+name: Self-Hosted Robotic Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  robotic-tests:
+    runs-on: [self-hosted, linux, ibm-i-runner]
+    strategy:
+      matrix:
+        test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Orchestrated Robotic Test
+        run: |
+          chmod +x ./tests/run_github_robot.sh
+          ./tests/run_github_robot.sh "${{ matrix.test-variant }}"
