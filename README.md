@@ -347,17 +347,18 @@ To maintain security, environment-specific details are kept outside of version c
 
 1. **Location**: `/home/github-runner/customer_config.json`
 2. **Format**:
+
    ```json
    {
      "a-hmc": {
        "yaml_file": "ops_hmc.yaml",
-       "host": "eur400a",
-       "env_file": ".env.eur400a_hmc"
+       "host": "<lpar_name>",
+       "env_file": ".env.<lpar_name>_hmc"
      },
      "t-direct": {
-       "yaml_file": "verify_system_integrity_conditional.yaml",
-       "host": "eur400t",
-       "env_file": ".env.eur400t_direct"
+       "yaml_file": "verify_system_integrity.yaml",
+       "host": "<lpar_name>",
+       "env_file": ".env.<lpar_name>_direct"
      }
    }
    ```
