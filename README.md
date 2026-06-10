@@ -353,12 +353,14 @@ To maintain security, environment-specific details are kept outside of version c
      "a-hmc": {
        "yaml_file": "ops_hmc.yaml",
        "host": "<lpar_name>",
-       "env_file": ".env.<lpar_name>_hmc"
+       "env_file": ".env.<lpar_name>_hmc",
+       "log_level": "debug"
      },
      "t-direct": {
        "yaml_file": "verify_system_integrity.yaml",
        "host": "<lpar_name>",
-       "env_file": ".env.<lpar_name>_direct"
+       "env_file": ".env.<lpar_name>_direct",
+       "log_level": "info"
      }
    }
    ```
