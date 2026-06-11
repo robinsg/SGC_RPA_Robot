@@ -47,6 +47,16 @@ YAML_FILE="${PARAMS[0]}"
 HOST_NAME="${PARAMS[1]}"
 ENV_FILE="${PARAMS[2]}"
 
+# Prepend the ENV_LOC path if it is provided by the GitHub environment
+if [[ -n "${ENV_LOC:-}" ]]; then
+    # Ensure ENV_LOC has a trailing slash
+    if [[ "${ENV_LOC}" != */ ]]; then
+        ENV_LOC="${ENV_LOC}/"
+    fi
+    # Prepend the location to the env file path
+    ENV_FILE="${ENV_LOC}${ENV_FILE}"
+fi
+
 echo "=========================================================="
 echo "Executing robotic tests for: $VARIANT_KEY"
 echo "Using parameters: --yaml-file $YAML_FILE --host [HIDDEN] --env [HIDDEN]"

@@ -15,6 +15,7 @@ on:
 jobs:
   robotic-tests:
     runs-on: [self-hosted, linux, ibm-i-runner]
+    environment: Development
     strategy:
       matrix:
         #### test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
@@ -36,6 +37,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Display Environment Variable
+        run: echo "ENV_LOC" is $ENV_LOC
       - name: Run Orchestrated Robotic Test
         run: |
           chmod +x ./tests/run_github_robot.sh
