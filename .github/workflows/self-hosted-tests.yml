@@ -16,6 +16,8 @@ jobs:
   robotic-tests:
     runs-on: [self-hosted, linux, ibm-i-runner]
     environment: Development
+    env:
+      ENV_LOC: ${{ vars.ENV_LOC }}
     strategy:
       matrix:
         #### test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
