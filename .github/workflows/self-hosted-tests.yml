@@ -38,7 +38,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Display Environment Variable
-        run: echo "ENV_LOC" is $ENV_LOC
+        run: echo "ENV_LOC=" $ENV_LOC
+
       - name: Run Orchestrated Robotic Test
         run: |
           chmod +x ./tests/run_github_robot.sh
