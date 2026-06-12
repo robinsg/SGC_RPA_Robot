@@ -5,3 +5,4 @@ Fix example yaml file names
 .secrests HMC testing
 test when disconnected
 Test invalid compare values
+Test "security level too low" error
