@@ -15,14 +15,9 @@ on:
 jobs:
   robotic-tests:
     runs-on: [self-hosted, linux, ibm-i-runner]
-    environment: Development
-    env:
-      ENV_LOC: ${{ vars.ENV_LOC }}
     strategy:
       matrix:
-        #### test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
-        test-variant: ["t-direct", "b-direct"]
-
+        test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
       fail-fast: false
 
     steps:
@@ -38,9 +33,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Display Environment Variable
-        run: echo "ENV_LOC=" $ENV_LOC
 
       - name: Run Orchestrated Robotic Test
         run: |

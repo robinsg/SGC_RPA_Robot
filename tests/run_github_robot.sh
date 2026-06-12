@@ -43,19 +43,16 @@ if [[ ${#PARAMS[@]} -lt 3 ]] || [[ -z "${PARAMS[0]}" ]] || [[ -z "${PARAMS[1]}" 
     exit 1
 fi
 
+SECRETS_PATH="$(pwd)/.secrets/"
+YAML_PATH="${SECRETS_PATH}/yaml_scripts/"
 YAML_FILE="${PARAMS[0]}"
 HOST_NAME="${PARAMS[1]}"
 ENV_FILE="${PARAMS[2]}"
 
-# Prepend the ENV_LOC path if it is provided by the GitHub environment
-if [[ -n "${ENV_LOC:-}" ]]; then
-    # Ensure ENV_LOC has a trailing slash
-    if [[ "${ENV_LOC}" != */ ]]; then
-        ENV_LOC="${ENV_LOC}/"
-    fi
-    # Prepend the location to the env file path
-    ENV_FILE="${ENV_LOC}${ENV_FILE}"
-fi
+# Prepend the SECRETS_PATH path
+    # Prepend the location to the env and yaml config file path
+    ENV_FILE="${SECRETS_PATH}${ENV_FILE}"
+    YAML_FILE="${YAML_PATH}${YAML_FILE}"
 
 echo "=========================================================="
 echo "Executing robotic tests for: $VARIANT_KEY"

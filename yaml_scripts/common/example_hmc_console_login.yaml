@@ -1,0 +1,95 @@
+# HMC Console session set up
+- type: "wait_for_text"
+  text: "Welcome to Remote 5250 Console"
+  description: "Wait for HMC welcome screen"
+  timeout_seconds: 20
+
+- type: "send_text"
+  text: "${HMC_LANG}"
+  description: "Enter language option"
+
+- type: "send_key"
+  key: "Enter"
+  description: "Send Enter"
+
+- type: "wait_for_text"
+  text: "Remote 5250 Console Sign on"
+  description: Detect HMC log in screen
+
+- type: "send_text"
+  text: "${HMC_USER}"
+
+- type: "send_key"
+  key: "Tab"
+  description: "Send HMC log in credentials"
+
+- type: "send_text"
+  text: "${HMC_PWD}"
+
+- type: "send_key"
+  key: "Enter"
+  description: "Send Enter"
+
+- type: "wait_for_text"
+  text: "Remote 5250 Console System Selection"
+  description: "Detect System Selection screen"
+  timeout_seconds: 20
+
+- type: "search_extract_and_send"
+  description: "Search for the HMC system and extract its selection option from column 5"
+  text: "${HMC_SYSNAME}"
+  row: 8
+  col: 12
+  end_row: 19
+  end_col: 27
+  extract_col: 5
+  extract_length: 1 # Adjust based on whether options can be 2 digits
+  timeout_seconds: 10
+
+- type: "send_key"
+  key: "Enter"
+  description: "Send Enter"
+
+- type: "wait_for_text"
+  text: "Remote 5250 Console Partition Selection"
+  description: "Wait for the partition selection screen"
+  timeout_seconds: 20
+
+- type: search_and_move_cursor
+  description: "Find the LPAR name and move cursor to the selection column (Col 5)"
+  text: "${HMC_LPARNAME}"
+  row: 11
+  col: 12
+  end_row: 21
+  end_col: 27
+  target_col: 5
+  timeout_seconds: 10
+
+- type: send_text
+  description: "Enter the connection mode (defaults to 2 if HMC_CONNECT_MODE is unset)"
+  text: "${HMC_CONNECT_MODE}"
+
+- type: "send_key"
+  key: "Enter"
+  description: "Send Enter"
+
+- type: "wait_for_text"
+  text: "Remote 5250 Console Session Key"
+  description: "Wait for the console session key selection screen"
+  timeout_seconds: 20
+
+- type: "send_text"
+  text: "${HMC_SESSION_KEY}"
+
+- type: "send_key"
+  key: "Tab"
+  description: "Send console sesion key"
+
+- type: "send_text"
+  text: "${HMC_SESSION_KEY}"
+
+- type: "send_key"
+  key: "Enter"
+  description: "Send Enter"
+
+- !include example_direct_ip_login.yaml

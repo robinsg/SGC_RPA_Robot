@@ -1,0 +1,166 @@
+definitions:
+  submit_enter: &submit_enter
+    type: "send_key"
+    key: "Enter"
+    description: "Send Enter"
+
+name: "IBM i System Integrity Verification (Conditional)"
+description: "Performs advanced checks on an IBM i system for IOCs using the search_and_compare action for conditional logic."
+
+steps:
+  # Load the common login steps for direct connection
+  - !include common/example_direct_ip_login.yaml
+
+  - type: "wait_for_text"
+    text: "{{IBM_I_MAIN}}"
+    description: "Ensure we are starting from the {{IBM_I_MAIN}}"
+    row: 1
+    col: 33
+    timeout_seconds: 10
+
+  # --- 1. System Configuration Check (QSECURITY) ---
+  # --- Check Sysval QSECURITY
+  - type: "send_text"
+    text: "DSPSYSVAL SYSVAL(QSECURITY)"
+    description: "Display the QSECURITY system value"
+
+  - *submit_enter
+
+  - type: "wait_for_text"
+    text: "{{DSPSYSVAL}}"
+    description: "Wait for the DSPSYSVAL screen to load"
+
+  - type: "compare"
+    description: "Check if system security level is at least 50"
+    row: 7
+    col: 35
+    length: 2
+    expected: "{{SEC_QSECURITY}}"
+    operator: "GE"
+    if_true:
+      - type: "send_key"
+        key: "F3"
+    if_false:
+      - type: "terminate"
+        reason: "CRITICAL: QSECURITY level is not 40 or 50."
+
+  # --- Check Sysval QPWDLVL
+  - type: "wait_for_text"
+    text: "{{IBM_I_MAIN}}"
+
+  - type: "send_text"
+    text: "DSPSYSVAL SYSVAL(QPWDLVL)"
+    description: "Display the QPWDLVL system value"
+
+  - *submit_enter
+
+  - type: "wait_for_text"
+    text: "{{DSPSYSVAL}}"
+    description: "Wait for the DSPSYSVAL screen to load"
+
+  - type: "compare"
+    description: "Verify QPWDLVL system value using relative search"
+    search_text: "Password level . . . . :"
+    row: 5
+    col: 2
+    end_row: 9
+    end_col: 80
+    extract_col: 29
+    extract_length: 1
+    expected: "{{SEC_QPWDLVL}}"
+    operator: "EQ"
+    if_false:
+      - type: "terminate"
+        reason: "System password level does not match expected value of {{SEC_QPWDLVL}}."
+    if_true:
+      - type: "send_key"
+        key: "F3"
+
+  # --- Check Sysval QALWOBJRST
+
+  - type: "send_text"
+    text: "DSPSYSVAL SYSVAL(QALWOBJRST)"
+    description: "Display QALWOBJRST system value"
+
+  - *submit_enter
+
+  - type: "search_and_compare"
+    text: "*ALL" # Search for an approved security level
+    row: 9
+    col: 2
+    end_row: 9
+    end_col: 5
+    description: "Check if allow object restore is *ALL. Terminate if not."
+    if_false:
+      - type: "capture"
+        filename: "error_qalwobjrst_level_too_high"
+      - type: "terminate"
+        reason: "CRITICAL: QALWOBJRST is set to *ALL."
+
+  - type: "send_key"
+    key: "F3"
+    description: "Exit DSPSYSVAL"
+
+  # --- Check Sysval QALWOBJRST
+  - type: "wait_for_text"
+    text: "{{IBM_I_MAIN}}"
+
+  # --- 2. User Profile Check (Unauthorized *ALLOBJ*) ---
+  # This example checks for a specific, known-bad user profile.
+  - type: "send_text"
+    text: "ADDLIBLE QSHONI"
+    description: "Add Q Shell On I (QSHONI) to library list"
+
+  - *submit_enter
+
+  - type: "wait_for_text"
+    text: "Library QSHONI added to library list."
+    is_message_line: true
+    description: "Check message line to verify library is in library list"
+
+  - type: "send_text"
+    text: QSHBASH CMDLINE('system "PRTUSRPRF TYPE(*AUTINFO) SPCAUT(*ALLOBJ)"| grep X | grep  "QSECOFR"')
+    description: "Print User Profiles with *ALLOBJ and extract QSECOFR"
+
+  - *submit_enter
+
+  - type: "wait_for_text"
+    text: " QShell bash command completed."
+    is_message_line: true
+    description: "Wait for PRTUSRPRF to complete"
+    timeout_seconds: 60
+
+  - type: "send_text"
+    text: "dsppfm qtemp/stdoutqsh"
+    description: Display the PRTUSRPTF report"
+
+  - *submit_enter
+
+  - type: "search_and_compare"
+    text: "QSECOFR"
+    description: "Search for a specific unauthorized high-privilege user."
+    if_true: # If the bad user is found, terminate
+      - type: "capture"
+        filename: "error_unauthorized_admin_found"
+      - type: "terminate"
+        reason: "DUMMY RUN: Unauthorized user with *ALLOBJ authority found."
+
+  - type: "send_key"
+    key: "F3"
+    description: "Exit display"
+
+  - type: terminate
+    reason: debugging
+
+  - type: "wait_for_text"
+    text: "{{IBM_I_MAIN}}"
+
+  # --- 4. Final Actions ---
+  - type: "capture"
+    filename: "system_integrity_check_passed"
+    description: "Capture a final screen to confirm all checks passed"
+
+  - type: "send_text"
+    text: "signoff"
+
+  - *submit_enter
