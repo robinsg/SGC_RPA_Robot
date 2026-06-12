@@ -6,3 +6,4 @@ Fix example yaml file names
 test when disconnected
 Test invalid compare values
 Test "security level too low" error
+Test merged branches
