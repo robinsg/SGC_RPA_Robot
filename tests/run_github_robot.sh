@@ -29,7 +29,7 @@ try:
         print(variant.get('yaml_file', ''))
         print(variant.get('host', ''))
         print(variant.get('env_file', ''))
-        print(variant.get('log_level, ''))
+        print(variant.get('log_level', ''))
     else:
         sys.exit(1)
 except Exception:
