@@ -112,18 +112,33 @@ log_message() {
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
     local log_file="${LOG_DIR}/${LPAR_NAME_LOWER}.log"
-    
+
     # Append the formatted message to the log file
     echo "${timestamp},${LPAR_NAME_LOWER},BASH: ${message}" >> "$log_file"
-    
+
     # Also print the original message to the console
     echo "${message}"
 }
 
+# Logs a sensitive message based on the current LOG_LEVEL.
+# If LOG_LEVEL is 'debug', the detailed message is logged.
+# Otherwise, the simplified message is logged.
+log_sensitive() {
+    local debug_message="$1"
+    local info_message="$2"
+    local current_level
+    current_level=$(echo "${LOG_LEVEL:-INFO}" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$current_level" == "debug" ]]; then
+        log_message "$debug_message"
+    else
+        log_message "$info_message"
+    fi
+}
 
 # --- Configuration Loading ---
 if [ -f "$ENV_FILE" ]; then
-  log_message "Loading environment variables from $ENV_FILE"
+  log_sensitive "Loading environment variables from $ENV_FILE" "Loading environment variables"
   # Manually parse the .env file instead of sourcing it to prevent code injection.
   while IFS= read -r line || [[ -n "$line" ]]; do
     # Strip leading/trailing whitespace
@@ -196,7 +211,7 @@ else
     fi
 fi
 
-log_message "Testing connectivity to ${CHECK_HOST}:${CHECK_PORT}..."
+log_sensitive "Testing connectivity to ${CHECK_HOST}:${CHECK_PORT}..." "Testing connectivity"
 # timeout 2s, 2>/dev/null to suppress 'connection refused' bash errors
 if ! timeout 2 bash -c "true > /dev/tcp/${CHECK_HOST}/${CHECK_PORT}" 2>/dev/null; then
     log_message "Error: Port ${CHECK_PORT} on host ${CHECK_HOST} is not reachable."
@@ -224,7 +239,7 @@ else
 fi
 
 if [ -n "${HMC_HOST:-}" ]; then
-    log_message "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
+    log_sensitive "HMC_HOST detected. Connecting via HMC Proxy on port 2301." "HMC_HOST detected, connecting via HMC Proxy"
     # Use the simplified connection format requested for HMC
     FULL_CMD=(tn5250 "ssl:${HMC_HOST:-}:2301")
 else
@@ -261,8 +276,8 @@ fi
 
 # Track if this script instance created the session (now effectively always true)
 SESSION_CREATED_BY_SCRIPT=true
-log_message "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST"
-log_message "Executing: ${FULL_CMD[*]} with window size ${TMUX_SIZE[*]}"
+log_sensitive "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST" "Starting new TN5250 session"
+log_sensitive "Executing: ${FULL_CMD[*]} with window size ${TMUX_SIZE[*]}" "Executing tn5250 command"
 tmux new-session -d -s "$TMUX_SESSION" "${TMUX_SIZE[@]}" "${FULL_CMD[@]}"
 
 # Robustness Check: Wait a moment and verify the session started.

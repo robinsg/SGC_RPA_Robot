@@ -132,6 +132,29 @@ def test_env_arg_success(tmp_path):
         )
         # It should NOT fail with "Configuration file '.env.wronghost' not found"
         assert "Error: Configuration file '.env.wronghost' not found" not in result.stdout
-        assert "Loading environment variables from .env.custom" in result.stdout
+        assert "Loading environment variables" in result.stdout
+        # It should NOT show the path by default
+        assert ".env.custom" not in result.stdout
+    finally:
+        os.chdir(original_cwd)
+
+def test_debug_log_level(tmp_path):
+    yaml_file = tmp_path / "test.yaml"
+    yaml_file.write_text("name: test")
+    env_file = tmp_path / ".env.debug"
+    env_file.write_text("TN5250_USER=test\nTN5250_PASSWORD=test\nLOG_LEVEL=debug")
+
+    # Change CWD to tmp_path to run the script
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        script_path = os.path.join(original_cwd, "run-robot.sh")
+        result = subprocess.run(
+            [script_path, "-f", "test.yaml", "-h", "debughost", "-e", ".env.debug"],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "LOG_LEVEL": "debug"}
+        )
+        assert "Loading environment variables from .env.debug" in result.stdout
     finally:
         os.chdir(original_cwd)
