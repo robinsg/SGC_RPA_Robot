@@ -29,6 +29,7 @@ try:
         print(variant.get('yaml_file', ''))
         print(variant.get('host', ''))
         print(variant.get('env_file', ''))
+        print(variant.get('log_level, ''))
     else:
         sys.exit(1)
 except Exception:
@@ -38,7 +39,7 @@ except Exception:
 # Use a temporary array to capture the output
 mapfile -t PARAMS < <(python3 -c "$PARSE_CMD")
 
-if [[ ${#PARAMS[@]} -lt 3 ]] || [[ -z "${PARAMS[0]}" ]] || [[ -z "${PARAMS[1]}" ]] || [[ -z "${PARAMS[2]}" ]]; then
+if [[ ${#PARAMS[@]} -lt 4 ]] || [[ -z "${PARAMS[0]}" ]] || [[ -z "${PARAMS[1]}" ]] || [[ -z "${PARAMS[2]}" ]] || [[ -z "${PARAMS[3]}" ]]; then
     echo "ERROR: Could not resolve valid config for key '$VARIANT_KEY' in $CONFIG_FILE."
     exit 1
 fi
@@ -48,6 +49,7 @@ YAML_PATH="${SECRETS_PATH}/yaml_scripts/"
 YAML_FILE="${PARAMS[0]}"
 HOST_NAME="${PARAMS[1]}"
 ENV_FILE="${PARAMS[2]}"
+LOG_LEVEL="${PARAMS[3]}"
 
 # Prepend the SECRETS_PATH path
     # Prepend the location to the env and yaml config file path
@@ -63,4 +65,4 @@ echo "=========================================================="
 chmod +x ./run-robot.sh
 
 # Trigger the existing, original wrapper script with the unpacked arguments
-./run-robot.sh --yaml-file "$YAML_FILE" --host "$HOST_NAME" --env "$ENV_FILE"
+LOG_LEVEL="${LOG_LEVEL:-INFO}" ./run-robot.sh --yaml-file "$YAML_FILE" --host "$HOST_NAME" --env "$ENV_FILE"
