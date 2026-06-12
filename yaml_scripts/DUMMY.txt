@@ -4,4 +4,4 @@ Fix example yaml file names
 .secrets testing
 .secrests HMC testing
 test when disconnected
-test invalid compare values
+Test invalid compare values
