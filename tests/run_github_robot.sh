@@ -43,7 +43,7 @@ if [[ ${#PARAMS[@]} -lt 3 ]] || [[ -z "${PARAMS[0]}" ]] || [[ -z "${PARAMS[1]}" 
     exit 1
 fi
 
-SECRETS_PATH="$(pwd)/.secrets/"
+SECRETS_PATH="${HOME}/.secrets/"
 YAML_PATH="${SECRETS_PATH}/yaml_scripts/"
 YAML_FILE="${PARAMS[0]}"
 HOST_NAME="${PARAMS[1]}"
