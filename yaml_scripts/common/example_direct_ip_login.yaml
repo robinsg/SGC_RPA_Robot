@@ -1,0 +1,37 @@
+- type: "wait_for_text"
+  text: "Sign On"
+  description: "Wait for the sign-on screen"
+  timeout_seconds: 20
+
+- type: "send_text"
+  text: "${TN5250_USER}"
+  description: "Enter user name"
+
+- type: "send_key"
+  key: "Tab"
+  description: "Move to password field"
+
+- type: "send_text"
+  text: "${TN5250_PASSWORD}"
+  description: "Enter password"
+
+- type: "sleep"
+  seconds: 0.5
+  description: "Pause briefly before submitting"
+
+- type: "send_key"
+  key: "Enter"
+  description: "Submit user credentials"
+
+- type: "press_key_if_text_present"
+  text: "Sign-on Information"
+  key: "Enter"
+  timeout_seconds: 10
+  description: "Acknowledge optional Sign On Information display"
+
+- type: "wait_for_text"
+  text: "IBM i Main Menu"
+  description: "Ensure we reached the main menu"
+  row: 1
+  col: 33
+  timeout_seconds: 10 # It's good practice to have a timeout to prevent infinite hangs
