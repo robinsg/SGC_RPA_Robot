@@ -139,6 +139,51 @@ class RobotEngine:
         max_cols: Maximum columns for the terminal device type.
     """
 
+    def _is_hmc_sensitive(self, pane_content: str) -> bool:
+        """Check if the current screen is a sensitive HMC selection screen.
+
+        Condition: HMC_HOST is set, GITHUB_ACTIONS is true, LOG_LEVEL is debug,
+        and the screen contains sensitive headings on line 1.
+
+        Args:
+            pane_content: The raw captured pane content.
+
+        Returns:
+            True if the screen is sensitive and should be redacted.
+        """
+        if not (
+            os.environ.get("HMC_HOST")
+            and os.environ.get("GITHUB_ACTIONS") == "true"
+            and self.log_level == "DEBUG"
+        ):
+            return False
+
+        lines = pane_content.splitlines()
+        if not lines:
+            return False
+
+        line_1 = lines[0]
+        sensitive_headings = [
+            "Remote 5250 Console System Selection",
+            "Remote 5250 Console Partition Selection",
+        ]
+        return any(heading in line_1 for heading in sensitive_headings)
+
+    def _get_redacted_content(self, pane_content: str) -> str:
+        """Return a redacted version of the screen content if it's sensitive.
+
+        Args:
+            pane_content: The raw captured pane content.
+
+        Returns:
+            Redacted explanatory message if sensitive, original content otherwise.
+        """
+        if self._is_hmc_sensitive(pane_content):
+            lines = pane_content.splitlines()
+            title = lines[0].strip() if lines else "HMC Selection Screen"
+            return f"--- SENSITIVE HMC SCREEN REDACTED ---\nScreen: {title}\nThis screen contains customer-specific configuration and has been hidden for security in GitHub Actions logs.\n--- END REDACTION ---"
+        return pane_content
+
     def __init__(self, yaml_path: str):
         """Initialize the RobotEngine.
 
@@ -462,12 +507,19 @@ class RobotEngine:
         current_rows, _ = self._detect_current_screen_dimensions(pane_content)
         new_title = self._get_screen_title(pane_content, current_rows)
 
+        # Apply redaction for logging and history if needed
+        redacted_content = self._get_redacted_content(pane_content)
+        is_redacted = redacted_content != pane_content
+
         if new_title and new_title != self.last_logged_title:
-            logger.info(f"[Screen] {new_title}")
+            display_title = (
+                "[REDACTED]" if is_redacted else new_title
+            )
+            logger.info(f"[Screen] {display_title}")
             self.last_logged_title = new_title
-            # Store unique screens in history
-            if not self.history_screens or self.history_screens[-1] != pane_content:
-                self.history_screens.append(pane_content)
+            # Store unique screens in history (using redacted content if applicable)
+            if not self.history_screens or self.history_screens[-1] != redacted_content:
+                self.history_screens.append(redacted_content)
             # Keep history to a reasonable size, e.g., last 20 screens
             if len(self.history_screens) > 20:
                 self.history_screens.pop(0)
@@ -680,6 +732,8 @@ class RobotEngine:
             return
         try:
             pane_content = self.capture_pane()
+            redacted_content = self._get_redacted_content(pane_content)
+
             timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
             capture_dir = os.path.join(os.getcwd(), "logs", "captures", self.host)
             os.makedirs(capture_dir, exist_ok=True)
@@ -688,7 +742,7 @@ class RobotEngine:
             save_path = os.path.join(capture_dir, filename)
 
             with open(save_path, "w") as f:
-                f.write(pane_content)
+                f.write(redacted_content)
             logger.debug(
                 f"[Debug Capture] Screen saved to {os.path.relpath(save_path)}"
             )
@@ -724,8 +778,9 @@ class RobotEngine:
 
             if self.log_level == "DEBUG":
                 before = self.capture_pane()
+                redacted_before = self._get_redacted_content(before)
                 logger.debug(
-                    f"\n--- Before {key} ---\n{before}\n--- End Before {key} ---"
+                    f"\n--- Before {key} ---\n{redacted_before}\n--- End Before {key} ---"
                 )
 
             self.run_tmux(["send-keys", "-t", self.session, key_to_send])
@@ -733,7 +788,10 @@ class RobotEngine:
 
             if self.log_level == "DEBUG":
                 after = self.capture_pane()
-                logger.debug(f"\n--- After {key} ---\n{after}\n--- End After {key} ---")
+                redacted_after = self._get_redacted_content(after)
+                logger.debug(
+                    f"\n--- After {key} ---\n{redacted_after}\n--- End After {key} ---"
+                )
 
             self.capture_debug_screen(f"after_send_key_{key}")
         elif isinstance(step, SleepAction):
@@ -771,7 +829,7 @@ class RobotEngine:
                         f"{base_name}_signoff_success_fallback_{timestamp}.txt"
                     )
             else:
-                capture_content = current_screen_content
+                capture_content = self._get_redacted_content(current_screen_content)
                 final_filename = f"{base_name}_{timestamp}.txt"
 
             save_path = os.path.join(host_dir, final_filename)
