@@ -343,11 +343,7 @@ This project supports execution on self-hosted GitHub runners for secure, intern
 
 #### Configuration
 
-To maintain security:
-
-- Environment-specific details are kept outside of version control in a JSON configuration file on the runner.
-- Arguments passed to run_robot.sh are masked on the runner.
-- Any variables in the .env.<lpar_name> files using Secret() are masked on the runner.
+To maintain security, environment-specific details are kept outside of version control in a JSON configuration file on the runner.
 
 1. **Location**: `/home/github-runner/customer_config.json`
 2. **Format**:

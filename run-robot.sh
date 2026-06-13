@@ -83,9 +83,9 @@ fi
 # 1. At the provided path
 # 2. In the yaml_scripts directory
 if [[ -f "$YAML_FILE" ]]; then
-    : # File found at provided path
+    YAML_FILE=$(readlink -f "$YAML_FILE" 2>/dev/null || echo "$YAML_FILE")
 elif [[ -f "yaml_scripts/$YAML_FILE" ]]; then
-    YAML_FILE="yaml_scripts/$YAML_FILE"
+    YAML_FILE=$(readlink -f "yaml_scripts/$YAML_FILE" 2>/dev/null || echo "$YAML_FILE")
 else
     echo "Error: YAML file '$YAML_FILE' not found (checked current directory and yaml_scripts/)." >&2
     exit 1
@@ -100,9 +100,34 @@ if [[ -n "$ENV_FILE_ARG" ]]; then
         echo "Error: Environment file name must start with '.env'" >&2
         exit 1
     fi
-    ENV_FILE="$ENV_FILE_ARG"
+    ENV_FILE=$(readlink -f "$ENV_FILE_ARG" 2>/dev/null || echo "$ENV_FILE_ARG")
 else
-    ENV_FILE=".env.${LPAR_NAME_LOWER}"
+    ENV_FILE=$(readlink -f ".env.${LPAR_NAME_LOWER}" 2>/dev/null || echo ".env.${LPAR_NAME_LOWER}")
+fi
+
+# GitHub Actions Masking
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::add-mask::$YAML_FILE"
+    echo "::add-mask::$ENV_FILE"
+    # Mask all case combinations of the host name (up to 12 chars)
+    python3 -c "
+import os
+def emit_host_masks(s):
+    if not s: return
+    n = len(s)
+    masks = set()
+    if n <= 12:
+        for i in range(1 << n):
+            res = ''.join(s[j].upper() if (i >> j) & 1 else s[j].lower() for j in range(n))
+            masks.add(res)
+    else:
+        masks.add(s)
+        masks.add(s.lower())
+        masks.add(s.upper())
+    for m in sorted(masks):
+        print(f'::add-mask::{m}')
+emit_host_masks('$LPAR_NAME_LOWER')
+"
 fi
 
 # --- Unified Logging Function ---
@@ -160,12 +185,26 @@ if [ -f "$ENV_FILE" ]; then
       # Trim whitespace from key and value
       key=$(echo "$key" | xargs)
       value=$(echo "$value" | xargs)
-      # Handle Secret() keyword
-      if [[ "$value" == Secret\(*\) ]]; then
+      # Handle Secret() or Secure() keywords
+      if [[ "$value" == Secret\(* ]] || [[ "$value" == Secure\(* ]]; then
         # Extract content between parentheses
-        secret_content="${value#Secret(}"
+        if [[ "$value" == Secret\(* ]]; then
+          secret_content="${value#Secret(}"
+        else
+          secret_content="${value#Secure(}"
+        fi
         secret_content="${secret_content%)}"
         value=$(echo "$secret_content" | xargs)
+
+        # Strip quotes from value for masking
+        mask_value="${value%\"}"
+        mask_value="${mask_value#\"}"
+        mask_value="${mask_value%\'}"
+        mask_value="${mask_value#\'}"
+
+        if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+            echo "::add-mask::$mask_value"
+        fi
 
         # Add to ROBOT_SENSITIVE_VARS
         if [ -z "${ROBOT_SENSITIVE_VARS:-}" ]; then

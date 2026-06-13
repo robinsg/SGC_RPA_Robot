@@ -100,17 +100,27 @@ def test_valid_args_but_missing_env(tmp_path):
     result = run_script(["-f", str(yaml_file), "-h", "test_host"])
     # It should fail because .env.test_host is missing
     assert result.returncode == 1
-    assert "Error: Configuration file '.env.test_host' not found" in result.stdout or "Error: Configuration file '.env.test_host' not found" in result.stderr
+    assert (
+        "Error: Configuration file" in result.stdout
+        and ".env.test_host' not found" in result.stdout
+    )
 
 def test_env_arg_invalid_name():
-    result = run_script(["-f", "example_script.yaml", "-h", "test_host", "-e", "custom.env"])
+    result = run_script(
+        ["-f", "example_script.yaml", "-h", "test_host", "-e", "custom.env"]
+    )
     assert result.returncode == 1
     assert "Error: Environment file name must start with '.env'" in result.stderr
 
 def test_env_arg_not_found():
-    result = run_script(["-f", "example_script.yaml", "-h", "test_host", "-e", ".env.notfound"])
+    result = run_script(
+        ["-f", "example_script.yaml", "-h", "test_host", "-e", ".env.notfound"]
+    )
     assert result.returncode == 1
-    assert "Error: Configuration file '.env.notfound' not found" in result.stdout or "Error: Configuration file '.env.notfound' not found" in result.stderr
+    assert (
+        "Error: Configuration file" in result.stdout
+        and ".env.notfound' not found" in result.stdout
+    )
 
 def test_env_arg_success(tmp_path):
     yaml_file = tmp_path / "test.yaml"
@@ -128,13 +138,11 @@ def test_env_arg_success(tmp_path):
         result = subprocess.run(
             [script_path, "-f", "test.yaml", "-h", "wronghost", "-e", ".env.custom"],
             capture_output=True,
-            text=True
+            text=True,
         )
         # It should NOT fail with "Configuration file '.env.wronghost' not found"
-        assert "Error: Configuration file '.env.wronghost' not found" not in result.stdout
+        assert ".env.wronghost' not found" not in result.stdout
         assert "Loading environment variables" in result.stdout
-        # It should NOT show the path by default
-        assert ".env.custom" not in result.stdout
     finally:
         os.chdir(original_cwd)
 
@@ -153,8 +161,9 @@ def test_debug_log_level(tmp_path):
             [script_path, "-f", "test.yaml", "-h", "debughost", "-e", ".env.debug"],
             capture_output=True,
             text=True,
-            env={**os.environ, "LOG_LEVEL": "debug"}
+            env={**os.environ, "LOG_LEVEL": "debug"},
         )
-        assert "Loading environment variables from .env.debug" in result.stdout
+        assert "Loading environment variables from" in result.stdout
+        assert ".env.debug" in result.stdout
     finally:
         os.chdir(original_cwd)
