@@ -56,6 +56,56 @@ LOG_LEVEL="${PARAMS[3]}"
     ENV_FILE="${SECRETS_PATH}${ENV_FILE}"
     YAML_FILE="${YAML_PATH}${YAML_FILE}"
 
+# GitHub Actions Masking
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    # Pass variables to python via environment to avoid escaping issues
+    export MASK_HOST_NAME="$HOST_NAME"
+    export MASK_YAML_FILE="$YAML_FILE"
+    export MASK_ENV_FILE="$ENV_FILE"
+    python3 -c "
+import os
+def emit_mask(s):
+    if not s: return
+    print(f'::add-mask::{s}')
+
+def emit_host_masks(s):
+    if not s: return
+    # To satisfy 'any case combination', we generate all permutations for short strings
+    # or just upper/lower for longer ones to avoid performance issues.
+    n = len(s)
+    masks = set()
+    if n <= 12:
+        for i in range(1 << n):
+            res = ''.join(s[j].upper() if (i >> j) & 1 else s[j].lower() for j in range(n))
+            masks.add(res)
+    else:
+        masks.add(s)
+        masks.add(s.lower())
+        masks.add(s.upper())
+    for m in sorted(masks):
+        print(f'::add-mask::{m}')
+
+emit_host_masks(os.environ.get('MASK_HOST_NAME'))
+emit_mask(os.environ.get('MASK_YAML_FILE'))
+emit_mask(os.environ.get('MASK_ENV_FILE'))
+
+env_file_path = os.environ.get('MASK_ENV_FILE')
+if env_file_path and os.path.exists(env_file_path):
+    with open(env_file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'): continue
+            if line.startswith('export '): line = line[7:].strip()
+            if '=' in line:
+                parts = line.split('=', 1)
+                value = parts[1].split(' #', 1)[0].strip()
+                if value.startswith('Secret(') and value.endswith(')'):
+                    secret = value[7:-1].strip().strip('\"\\'')
+                    emit_mask(secret)
+"
+    unset MASK_HOST_NAME MASK_YAML_FILE MASK_ENV_FILE
+fi
+
 echo "=========================================================="
 echo "Executing robotic tests for: $VARIANT_KEY"
 echo "Using parameters: --yaml-file $YAML_FILE --host [HIDDEN] --env [HIDDEN]"
