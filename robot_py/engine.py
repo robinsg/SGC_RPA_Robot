@@ -143,7 +143,8 @@ class RobotEngine:
         """Check if the current screen is a sensitive HMC selection screen.
 
         Condition: HMC_HOST is set, GITHUB_ACTIONS is true, LOG_LEVEL is debug,
-        and the screen contains sensitive headings on line 1.
+        and the screen contains sensitive headings on line 1. Heading list is
+        configurable via ROBOT_REDACTED_SCREENS environment variable.
 
         Args:
             pane_content: The raw captured pane content.
@@ -167,6 +168,13 @@ class RobotEngine:
             "Remote 5250 Console System Selection",
             "Remote 5250 Console Partition Selection",
         ]
+        # Add custom redacted screens from environment variable
+        custom_redacted = os.environ.get("ROBOT_REDACTED_SCREENS", "")
+        if custom_redacted:
+            sensitive_headings.extend(
+                [s.strip() for s in custom_redacted.split(",") if s.strip()]
+            )
+
         return any(heading in line_1 for heading in sensitive_headings)
 
     def _get_redacted_content(self, pane_content: str) -> str:
