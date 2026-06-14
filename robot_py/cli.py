@@ -33,14 +33,9 @@ def load_env_file(filepath: str):
                 key = key.strip()
                 value = value.strip()
 
-                # Handle Secret() or Secure() keywords
-                if (
-                    value.startswith("Secret(") or value.startswith("Secure(")
-                ) and value.endswith(")"):
-                    if value.startswith("Secret("):
-                        value = value[7:-1].strip().strip("\"'")
-                    else:
-                        value = value[7:-1].strip().strip("\"'")
+                # Handle Secret() keyword
+                if value.startswith("Secret(") and value.endswith(")"):
+                    value = value[7:-1].strip().strip("\"'")
 
                     if os.environ.get("GITHUB_ACTIONS") == "true":
                         print(f"::add-mask::{value}")

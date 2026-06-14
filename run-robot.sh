@@ -185,14 +185,10 @@ if [ -f "$ENV_FILE" ]; then
       # Trim whitespace from key and value
       key=$(echo "$key" | xargs)
       value=$(echo "$value" | xargs)
-      # Handle Secret() or Secure() keywords
-      if [[ "$value" == Secret\(* ]] || [[ "$value" == Secure\(* ]]; then
+      # Handle Secret() keyword
+      if [[ "$value" == Secret\(* ]]; then
         # Extract content between parentheses
-        if [[ "$value" == Secret\(* ]]; then
-          secret_content="${value#Secret(}"
-        else
-          secret_content="${value#Secure(}"
-        fi
+        secret_content="${value#Secret(}"
         secret_content="${secret_content%)}"
         value=$(echo "$secret_content" | xargs)
 
