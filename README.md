@@ -345,8 +345,7 @@ This project supports execution on self-hosted GitHub runners for secure, intern
 
 To maintain security, environment-specific details are kept outside of version control in a JSON configuration file on the runner.
 
-1. **Location**: `/home/github-runner/customer_config.json`
-2. **Format**:
+1. **Format**:
 
    ```json
    {
