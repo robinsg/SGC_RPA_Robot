@@ -57,7 +57,7 @@ class CustomFormatter(logging.Formatter):
             # Redact content between screen markers used in engine.py
             formatted_message = re.sub(
                 r"(--- .*? ---\n)(.*?)(\n--- End .*? ---)",
-                r"\1[INFO: Full screen content redacted from stdout. Check log files on Runner server  for details.]\3",
+                r"\1[INFO: Full screen content redacted from stdout. Check log files on Runner server for details.]\3",
                 formatted_message,
                 flags=re.DOTALL,
             )
