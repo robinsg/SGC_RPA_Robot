@@ -2,10 +2,6 @@ name: Self-Hosted Robotic Tests
 
 on:
   push:
-    branches:
-      - main
-      - develop
-      - CI-TEST
   pull_request:
     branches:
       - main
