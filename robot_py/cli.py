@@ -74,6 +74,9 @@ def main():
     yaml_arg = args.yaml_file
     env_arg = args.env
 
+    # Log the parameters before any potential masking for file logs
+    logger.debug(f"Using parameters: --yaml-file {yaml_arg} --host {os.environ.get('TN5250_HOST', '[NOT SET]')} --env {env_arg or '[NOT SET]'}")
+
     try:
         if env_arg:
             load_env_file(env_arg)

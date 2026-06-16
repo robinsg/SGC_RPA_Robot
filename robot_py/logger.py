@@ -70,10 +70,47 @@ class CustomFormatter(logging.Formatter):
                 [v.strip() for v in custom_sensitive.split(",") if v.strip()]
             )
 
-        for var in sensitive_vars:
-            value = os.environ.get(var)
-            if value and value in formatted_message:
-                formatted_message = formatted_message.replace(value, "********")
+        # Apply general masking for common sensitive patterns
+        # Masking for "--yaml-file /path/to/script.yaml"
+        formatted_message = re.sub(
+            r"(--yaml-file|-f)\s+[^\s]+\.yaml",
+            r"--yaml-file [MASKED_YAML_FILE]",
+            formatted_message,
+        )
+        # Masking for "--host <hostname>"
+        formatted_message = re.sub(
+            r"(--host|-h)\s+[^\s]+", r"--host [MASKED_HOST]", formatted_message
+        )
+        # Masking for "--env /path/to/.env.file"
+        formatted_message = re.sub(
+            r"(--env|-e)\s+[^\s]+\.env[^\s]*",
+            r"--env [MASKED_ENV_FILE]",
+            formatted_message,
+        )
+        # Masking for "Loading environment variables from /path/to/.env.file"
+        formatted_message = re.sub(
+            r"Loading environment variables from\s+[^\s]+\.env[^\s]*",
+            r"Loading environment variables from [MASKED_ENV_FILE]",
+            formatted_message,
+        )
+        # Masking for "Testing connectivity to <hostname>:<port>"
+        formatted_message = re.sub(
+            r"Testing connectivity to\s+[^:]+:\d+",
+            r"Testing connectivity to [MASKED_HOST]:[MASKED_PORT]",
+            formatted_message,
+        )
+        # Masking for "Starting new TN5250 session '<session-name>' for host: <hostname>"
+        formatted_message = re.sub(
+            r"Starting new TN5250 session\s+\'[^\']+\'\s+for host:\s+[^\s]+",
+            r"Starting new TN5250 session '[MASKED_SESSION_NAME]' for host: [MASKED_HOST]",
+            formatted_message,
+        )
+        # Masking for "Executing: tn5250 ... <hostname> with window size ..."
+        formatted_message = re.sub(
+            r"Executing:\s+tn5250\s+.*?\s+([^\s]+)\s+with window size",
+            r"Executing: tn5250 ... [MASKED_HOST] with window size",
+            formatted_message,
+        )
 
         return formatted_message
 
