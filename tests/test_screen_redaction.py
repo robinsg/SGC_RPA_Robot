@@ -3,7 +3,7 @@ import os
 import pytest
 from robot_py.logger import CustomFormatter
 
-REDACTED_MSG = "[INFO: Full screen content redacted from stdout. Check log files for details.]"
+REDACTED_MSG = "[INFO: Full screen content redacted from stdout. Check log files on Runner server for details.]"
 
 def test_screen_redaction_enabled(monkeypatch):
     """Test that screens are redacted when all conditions are met."""
