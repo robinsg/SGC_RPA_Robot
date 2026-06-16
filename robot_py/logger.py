@@ -28,16 +28,14 @@ class CustomFormatter(logging.Formatter):
     def _should_redact_screens(self) -> bool:
         """Check if screen redaction should be applied based on environment variables.
 
-        Redaction is active if HMC_HOST is set, GITHUB_ACTIONS is true,
-        and LOG_LEVEL is DEBUG.
+        Redaction is active if GITHUB_ACTIONS is true and LOG_LEVEL is DEBUG.
 
         Returns:
             True if screens should be redacted, False otherwise.
         """
-        hmc_host = os.environ.get("HMC_HOST")
         github_actions = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
         log_level = os.environ.get("LOG_LEVEL", "").upper() == "DEBUG"
-        return bool(hmc_host) and github_actions and log_level
+        return github_actions and log_level
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record with colours and mask sensitive data.
@@ -59,7 +57,7 @@ class CustomFormatter(logging.Formatter):
             # Redact content between screen markers used in engine.py
             formatted_message = re.sub(
                 r"(--- .*? ---\n)(.*?)(\n--- End .*? ---)",
-                r"\1[SCREEN REDACTED]\3",
+                r"\1[INFO: Full screen content redacted from stdout. Check log files for details.]\3",
                 formatted_message,
                 flags=re.DOTALL,
             )

@@ -275,13 +275,12 @@ To further secure the robot's execution environment, follow these recommendation
 
 To prevent sensitive customer data from being exposed in GitHub Actions logs or terminal output, the robot automatically redacts 5250 screen content from `stdout` when certain conditions are met.
 
-Redaction occurs if **all** of the following are true:
+Redaction occurs if **both** of the following are true:
 
-1.  `HMC_HOST` is assigned a value (indicating an HMC Proxy connection).
-2.  `GITHUB_ACTIONS` is set to `true`.
-3.  `LOG_LEVEL` is set to `debug`.
+1.  `GITHUB_ACTIONS` is set to `true`.
+2.  `LOG_LEVEL` is set to `debug`.
 
-When active, any full-screen dumps sent to the console (standard output) will be replaced with `[SCREEN REDACTED]`. Note that screens are **not** redacted in the log files stored on the runner/server, as these are typically located within a secure environment.
+When active, any full-screen dumps sent to the console (standard output) will be replaced with an informative message: `[INFO: Full screen content redacted from stdout. Check log files for details.]`. Note that screens are **not** redacted in the log files stored on the runner/server, as these are typically located within a secure environment.
 
 1. **Run under a Dedicated Service Account**:
 

@@ -56,7 +56,7 @@ The repo structure is intentional. **Never reorganise it.**
 - Never hardcode credentials, hostnames, or passwords.
 - All secrets must be loaded from `.env.<lpar>` environment files (which are git-ignored).
 - Validate that all required environment variables are present before the robot attempts any connection.
-- **Stdout Redaction**: When `HMC_HOST` is set, `GITHUB_ACTIONS` is `true`, and `LOG_LEVEL` is `debug`, all full-screen terminal dumps sent to standard output (stdout) must be redacted and replaced with `[SCREEN REDACTED]`.
+- **Stdout Redaction**: When `GITHUB_ACTIONS` is `true` and `LOG_LEVEL` is `debug`, all full-screen terminal dumps sent to standard output (stdout) must be redacted and replaced with an informative message.
 
 ### Testing
 

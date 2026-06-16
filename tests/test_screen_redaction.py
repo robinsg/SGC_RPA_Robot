@@ -3,9 +3,10 @@ import os
 import pytest
 from robot_py.logger import CustomFormatter
 
+REDACTED_MSG = "[INFO: Full screen content redacted from stdout. Check log files for details.]"
+
 def test_screen_redaction_enabled(monkeypatch):
     """Test that screens are redacted when all conditions are met."""
-    monkeypatch.setenv("HMC_HOST", "hmc.example.com")
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 
@@ -21,14 +22,14 @@ def test_screen_redaction_enabled(monkeypatch):
     )
 
     formatted = formatter.format(record)
-    assert "[SCREEN REDACTED]" in formatted
+    assert REDACTED_MSG in formatted
     assert "Line 1" not in formatted
     assert "Line 2" not in formatted
     assert "--- Before Enter ---" in formatted
     assert "--- End Before Enter ---" in formatted
 
-def test_screen_redaction_disabled_no_hmc(monkeypatch):
-    """Test that screens are NOT redacted when HMC_HOST is missing."""
+def test_screen_redaction_works_without_hmc(monkeypatch):
+    """Test that screens are redacted even if HMC_HOST is missing."""
     monkeypatch.delenv("HMC_HOST", raising=False)
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -45,13 +46,11 @@ def test_screen_redaction_disabled_no_hmc(monkeypatch):
     )
 
     formatted = formatter.format(record)
-    assert "[SCREEN REDACTED]" not in formatted
-    assert "Line 1" in formatted
-    assert "Line 2" in formatted
+    assert REDACTED_MSG in formatted
+    assert "Line 1" not in formatted
 
 def test_screen_redaction_disabled_no_github_actions(monkeypatch):
     """Test that screens are NOT redacted when GITHUB_ACTIONS is not true."""
-    monkeypatch.setenv("HMC_HOST", "hmc.example.com")
     monkeypatch.setenv("GITHUB_ACTIONS", "false")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 
@@ -67,14 +66,11 @@ def test_screen_redaction_disabled_no_github_actions(monkeypatch):
     )
 
     formatted = formatter.format(record)
-    assert "[SCREEN REDACTED]" not in formatted
+    assert REDACTED_MSG not in formatted
     assert "Line 1" in formatted
 
 def test_screen_redaction_disabled_not_debug(monkeypatch):
     """Test that screens are NOT redacted when LOG_LEVEL is not DEBUG."""
-    # Even if LOG_LEVEL env var is INFO, the formatter might still be called
-    # if the record level is higher, but the check is explicitly on the env var.
-    monkeypatch.setenv("HMC_HOST", "hmc.example.com")
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
 
@@ -90,12 +86,11 @@ def test_screen_redaction_disabled_not_debug(monkeypatch):
     )
 
     formatted = formatter.format(record)
-    assert "[SCREEN REDACTED]" not in formatted
+    assert REDACTED_MSG not in formatted
     assert "Line 1" in formatted
 
 def test_screen_redaction_multiple_screens(monkeypatch):
     """Test that multiple screens in a single message are all redacted."""
-    monkeypatch.setenv("HMC_HOST", "hmc.example.com")
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 
@@ -121,7 +116,7 @@ def test_screen_redaction_multiple_screens(monkeypatch):
     )
 
     formatted = formatter.format(record)
-    assert formatted.count("[SCREEN REDACTED]") == 2
+    assert formatted.count(REDACTED_MSG) == 2
     assert "Screen 1 content" not in formatted
     assert "Screen 2 content" not in formatted
     assert "Some text" in formatted
