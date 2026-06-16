@@ -1004,7 +1004,6 @@ class RobotEngine:
 
                     msg = f'Search for text failed to find "{text}". Actual value found: "{actual_value}".'
                     logger.info(msg)
-                    print(msg)
 
                 self.execute_steps(step.if_false)
         elif isinstance(step, TerminateAction):
