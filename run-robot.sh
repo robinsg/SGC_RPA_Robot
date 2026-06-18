@@ -145,13 +145,13 @@ log_message() {
         # Masking for tn5250 command (HMC connection)
         masked_message=$(echo "$masked_message" | sed -E 's/(Executing: tn5250 ssl:)[^:]+:[0-9]+/\1[MASKED_HOST]:[MASKED_PORT]/g')
 
-        # Masking for "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
+        # Masking for HMC connection port
         masked_message=$(echo "$masked_message" | sed -E 's/(Connecting via HMC Proxy on port )[0-9]+/\1[MASKED_PORT]/g')
 
-        # Masking for "Terminating tmux session: robot-eur400e"
+        # Masking for tmux session termination messages
         masked_message=$(echo "$masked_message" | sed -E "s/(Terminating tmux session:? (robot-)?'?)robot-[^ '.]+/\1robot-[MASKED_HOST]/g")
 
-        # Masking for "Session 'robot-eur400e' already terminated."
+        # Masking for already terminated sessions
         masked_message=$(echo "$masked_message" | sed -E "s/(Session 'robot-)[^']+/\1[MASKED_HOST]/g")
     fi
 

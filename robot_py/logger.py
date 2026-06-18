@@ -103,22 +103,21 @@ class CustomFormatter(logging.Formatter):
                 formatted_message,
             )
 
-            # Masking for "HMC_HOST detected. Connecting via HMC Proxy on port 2301."
+            # Masking for HMC connection port
             formatted_message = re.sub(
                 r"(Connecting via HMC Proxy on port )\d+",
                 r"\1[MASKED_PORT]",
                 formatted_message,
             )
 
-            # Masking for "[Debug Capture] Screen saved to logs/captures/eur400e/..."
+            # Masking for debug capture paths
             formatted_message = re.sub(
                 r"(Screen saved to logs/captures/)[^/]+/",
                 r"\1[MASKED_HOST]/",
                 formatted_message,
             )
 
-            # Masking for "[SearchMove] Found "EUR400E" at row 14."
-            # and "[SearchExtract] Found "EUR400E" at row 14."
+            # Masking for search and move/extract results
             lpar_name = os.environ.get("TN5250_HOST", "")
             if lpar_name:
                 # Mask LPAR name when it appears in quotes (found text)
@@ -129,7 +128,7 @@ class CustomFormatter(logging.Formatter):
                     flags=re.IGNORECASE,
                 )
 
-            # Masking for "INFO: [Screen] Work with Active Jobs                     EUR400E"
+            # Masking for screen title LPAR name
             if lpar_name:
                 formatted_message = re.sub(
                     rf"(\[Screen\].*?)\s+{re.escape(lpar_name)}\b",
@@ -138,16 +137,14 @@ class CustomFormatter(logging.Formatter):
                     flags=re.IGNORECASE,
                 )
 
-            # Masking for "[Capture] Saved to /full/path/to/last_screen.txt"
-            # Simplify to just the filename
+            # Masking for capture file paths (simplify to filename)
             formatted_message = re.sub(
                 r"(\[Capture\] Saved to ).*/([^/]+)",
                 r"\1file \2",
                 formatted_message,
             )
 
-            # Masking for "Terminating tmux session: robot-eur400e"
-            # and "Session 'robot-eur400e' already terminated."
+            # Masking for tmux session termination messages
             formatted_message = re.sub(
                 r"(Terminating tmux session:? robot-)[^\s]+",
                 r"\1[MASKED_HOST]",
