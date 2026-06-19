@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         ###  test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
-        test-variant: ["t-direct"]
+        test-variant: ["e-hmc"]
 
       fail-fast: false
 
