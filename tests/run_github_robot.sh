@@ -58,7 +58,7 @@ LOG_LEVEL="${PARAMS[3]}"
 
 echo "=========================================================="
 echo "Executing robotic tests for: $VARIANT_KEY"
-echo "Using parameters: --yaml-file $YAML_FILE --host [HIDDEN] --env [HIDDEN]"
+echo "Using parameters: --yaml-file [MASKED_YAML_FILE] --host [MASKED_HOST] --env [MASKED_ENV_FILE]"
 echo "Log level: $LOG_LEVEL"
 echo "=========================================================="
 

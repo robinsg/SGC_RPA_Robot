@@ -1,6 +1,6 @@
 import logging
 import os
-import re
+from .masker import LogMasker
 
 
 class CustomFormatter(logging.Formatter):
@@ -25,18 +25,6 @@ class CustomFormatter(logging.Formatter):
         logging.CRITICAL: bold_red + format_str + reset,
     }
 
-    def _should_redact_screens(self) -> bool:
-        """Check if screen redaction should be applied based on environment variables.
-
-        Redaction is active if GITHUB_ACTIONS is true and LOG_LEVEL is DEBUG.
-
-        Returns:
-            True if screens should be redacted, False otherwise.
-        """
-        github_actions = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
-        log_level = os.environ.get("LOG_LEVEL", "").upper() == "DEBUG"
-        return github_actions and log_level
-
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record with colours and mask sensitive data.
 
@@ -52,67 +40,7 @@ class CustomFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S.%3N")
         formatted_message = formatter.format(record)
 
-        # Redact screens if conditions are met
-        if self._should_redact_screens():
-            # Redact content between screen markers used in engine.py
-            formatted_message = re.sub(
-                r"(--- .*? ---\n)(.*?)(\n--- End .*? ---)",
-                r"\1[INFO: Full screen content redacted from stdout. Check log files on Runner server for details.]\3",
-                formatted_message,
-                flags=re.DOTALL,
-            )
-
-        # Mask sensitive environment variables
-        sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
-        custom_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
-        if custom_sensitive:
-            sensitive_vars.extend(
-                [v.strip() for v in custom_sensitive.split(",") if v.strip()]
-            )
-
-        # Apply general masking for common sensitive patterns
-        # Masking for "--yaml-file /path/to/script.yaml"
-        formatted_message = re.sub(
-            r"(--yaml-file|-f)\s+[^\s]+\.yaml",
-            r"--yaml-file [MASKED_YAML_FILE]",
-            formatted_message,
-        )
-        # Masking for "--host <hostname>"
-        formatted_message = re.sub(
-            r"(--host|-h)\s+[^\s]+", r"--host [MASKED_HOST]", formatted_message
-        )
-        # Masking for "--env /path/to/.env.file"
-        formatted_message = re.sub(
-            r"(--env|-e)\s+[^\s]+\.env[^\s]*",
-            r"--env [MASKED_ENV_FILE]",
-            formatted_message,
-        )
-        # Masking for "Loading environment variables from /path/to/.env.file"
-        formatted_message = re.sub(
-            r"Loading environment variables from\s+[^\s]+\.env[^\s]*",
-            r"Loading environment variables from [MASKED_ENV_FILE]",
-            formatted_message,
-        )
-        # Masking for "Testing connectivity to <hostname>:<port>"
-        formatted_message = re.sub(
-            r"Testing connectivity to\s+[^:]+:\d+",
-            r"Testing connectivity to [MASKED_HOST]:[MASKED_PORT]",
-            formatted_message,
-        )
-        # Masking for "Starting new TN5250 session '<session-name>' for host: <hostname>"
-        formatted_message = re.sub(
-            r"Starting new TN5250 session\s+\'[^\']+\'\s+for host:\s+[^\s]+",
-            r"Starting new TN5250 session '[MASKED_SESSION_NAME]' for host: [MASKED_HOST]",
-            formatted_message,
-        )
-        # Masking for "Executing: tn5250 ... <hostname> with window size ..."
-        formatted_message = re.sub(
-            r"Executing:\s+tn5250\s+.*?\s+([^\s]+)\s+with window size",
-            r"Executing: tn5250 ... [MASKED_HOST] with window size",
-            formatted_message,
-        )
-
-        return formatted_message
+        return LogMasker.mask_message(formatted_message)
 
 
 def setup_logger() -> logging.Logger:

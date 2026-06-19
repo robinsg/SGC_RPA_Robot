@@ -113,11 +113,12 @@ log_message() {
     timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
     local log_file="${LOG_DIR}/${LPAR_NAME_LOWER}.log"
 
-    # Append the formatted message to the log file
+    # Append the formatted message to the log file (unmasked)
     echo "${timestamp},${LPAR_NAME_LOWER},BASH: ${message}" >> "$log_file"
 
-    # Also print the original message to the console
-    echo "${message}"
+    # Also print the message to the console (potentially masked)
+    # Use the Python-based masking utility for consistent and robust masking.
+    PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.masker "$message"
 }
 
 # Logs a sensitive message based on the current LOG_LEVEL.
