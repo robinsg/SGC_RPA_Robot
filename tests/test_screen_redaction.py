@@ -1,9 +1,8 @@
 import logging
-import os
-import pytest
 from robot_py.logger import CustomFormatter
 
 REDACTED_MSG = "[INFO: Full screen content redacted from stdout. Check log files on Runner server for details.]"
+
 
 def test_screen_redaction_enabled(monkeypatch):
     """Test that screens are redacted when all conditions are met."""
@@ -18,7 +17,7 @@ def test_screen_redaction_enabled(monkeypatch):
         lineno=100,
         msg="\n--- Before Enter ---\nLine 1\nLine 2\n--- End Before Enter ---",
         args=(),
-        exc_info=None
+        exc_info=None,
     )
 
     formatted = formatter.format(record)
@@ -27,6 +26,7 @@ def test_screen_redaction_enabled(monkeypatch):
     assert "Line 2" not in formatted
     assert "--- Before Enter ---" in formatted
     assert "--- End Before Enter ---" in formatted
+
 
 def test_screen_redaction_works_without_hmc(monkeypatch):
     """Test that screens are redacted even if HMC_HOST is missing."""
@@ -42,12 +42,13 @@ def test_screen_redaction_works_without_hmc(monkeypatch):
         lineno=100,
         msg="\n--- Before Enter ---\nLine 1\nLine 2\n--- End Before Enter ---",
         args=(),
-        exc_info=None
+        exc_info=None,
     )
 
     formatted = formatter.format(record)
     assert REDACTED_MSG in formatted
     assert "Line 1" not in formatted
+
 
 def test_screen_redaction_disabled_no_github_actions(monkeypatch):
     """Test that screens are NOT redacted when GITHUB_ACTIONS is not true."""
@@ -62,12 +63,13 @@ def test_screen_redaction_disabled_no_github_actions(monkeypatch):
         lineno=100,
         msg="\n--- Before Enter ---\nLine 1\nLine 2\n--- End Before Enter ---",
         args=(),
-        exc_info=None
+        exc_info=None,
     )
 
     formatted = formatter.format(record)
     assert REDACTED_MSG not in formatted
     assert "Line 1" in formatted
+
 
 def test_screen_redaction_disabled_not_debug(monkeypatch):
     """Test that screens are NOT redacted when LOG_LEVEL is not DEBUG."""
@@ -82,12 +84,13 @@ def test_screen_redaction_disabled_not_debug(monkeypatch):
         lineno=100,
         msg="\n--- Before Enter ---\nLine 1\nLine 2\n--- End Before Enter ---",
         args=(),
-        exc_info=None
+        exc_info=None,
     )
 
     formatted = formatter.format(record)
     assert REDACTED_MSG not in formatted
     assert "Line 1" in formatted
+
 
 def test_screen_redaction_multiple_screens(monkeypatch):
     """Test that multiple screens in a single message are all redacted."""
@@ -112,7 +115,7 @@ def test_screen_redaction_multiple_screens(monkeypatch):
         lineno=100,
         msg=msg,
         args=(),
-        exc_info=None
+        exc_info=None,
     )
 
     formatted = formatter.format(record)

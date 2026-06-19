@@ -1,6 +1,4 @@
 import pytest
-import os
-import yaml
 from robot_py.schema import (
     parse_robot_script,
     Action,
@@ -14,8 +12,8 @@ from robot_py.schema import (
     SearchAndMoveCursorAction,
     SearchExtractAndSendAction,
     ExtractAtCursorAndSendAction,
-    RobotScript,
 )
+
 
 def test_action_from_dict_all_types():
     actions = [
@@ -26,8 +24,25 @@ def test_action_from_dict_all_types():
         {"type": "capture", "filename": "screen"},
         {"type": "press_key_if_text_present", "text": "Error", "key": "Reset"},
         {"type": "move_cursor", "row": 10, "col": 20},
-        {"type": "search_and_move_cursor", "text": "User", "row": 1, "col": 1, "end_row": 24, "end_col": 80, "target_col": 10},
-        {"type": "search_extract_and_send", "text": "ID:", "row": 1, "col": 1, "end_row": 24, "end_col": 80, "extract_col": 10, "extract_length": 5},
+        {
+            "type": "search_and_move_cursor",
+            "text": "User",
+            "row": 1,
+            "col": 1,
+            "end_row": 24,
+            "end_col": 80,
+            "target_col": 10,
+        },
+        {
+            "type": "search_extract_and_send",
+            "text": "ID:",
+            "row": 1,
+            "col": 1,
+            "end_row": 24,
+            "end_col": 80,
+            "extract_col": 10,
+            "extract_length": 5,
+        },
         {"type": "extract_at_cursor_and_send", "length": 10},
     ]
 
@@ -42,9 +57,11 @@ def test_action_from_dict_all_types():
     assert isinstance(Action.from_dict(actions[8]), SearchExtractAndSendAction)
     assert isinstance(Action.from_dict(actions[9]), ExtractAtCursorAndSendAction)
 
+
 def test_action_from_dict_unknown_type():
     with pytest.raises(ValueError, match="Unknown action type: unknown"):
         Action.from_dict({"type": "unknown"})
+
 
 def test_parse_robot_script_basic(tmp_path):
     yaml_content = """
@@ -72,6 +89,7 @@ steps:
     assert isinstance(script.steps[0], SendTextAction)
     assert script.steps[0].text == "hello"
 
+
 def test_parse_robot_script_env_substitution(tmp_path, monkeypatch):
     monkeypatch.setenv("TEST_VAR", "substituted_value")
     yaml_content = """
@@ -87,6 +105,7 @@ steps:
 
     assert script.name == "substituted_value"
     assert script.steps[0].text == "default_value"
+
 
 def test_parse_robot_script_missing_env_no_default(tmp_path, monkeypatch):
     monkeypatch.delenv("MISSING_VAR", raising=False)

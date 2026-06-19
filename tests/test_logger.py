@@ -1,7 +1,7 @@
 import os
-import pytest
 from robot_py.logger import setup_logger
 import logging
+
 
 def test_setup_logger_creates_dir(tmp_path, monkeypatch):
     log_dir = tmp_path / "test_logs"

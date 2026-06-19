@@ -110,9 +110,11 @@ class SendTextAction(Action):
 
     Attributes:
         text: The string to be sent.
+        key: Optional key or list of keys to send after the text.
     """
 
     text: str = ""
+    key: Optional[Union[str, List[str]]] = None
 
 
 @dataclass

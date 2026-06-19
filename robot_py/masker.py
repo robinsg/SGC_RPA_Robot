@@ -1,6 +1,7 @@
 import os
 import re
 
+
 class LogMasker:
     """Utility class for masking sensitive data in log messages."""
 
@@ -147,8 +148,10 @@ class LogMasker:
 
         return masked_message
 
+
 if __name__ == "__main__":
     import sys
+
     # Read from stdin if no arguments, otherwise join arguments
     if len(sys.argv) > 1:
         input_text = " ".join(sys.argv[1:])

@@ -241,6 +241,28 @@ class RobotEngine:
         else:
             logger.debug(f"Session {self.session} already gone, no need to terminate.")
 
+    def _send_single_key(self, key: str):
+        """Helper to send a single key with logging and debug capture.
+
+        Args:
+            key: The logical name of the key to send.
+        """
+        key_to_send = KEY_MAP.get(key, key)
+        logger.debug(f"[Key Send] Sending key: '{key}' -> tmux: '{key_to_send}'")
+
+        if self.log_level == "DEBUG":
+            before = self.capture_pane()
+            logger.debug(f"\n--- Before {key} ---\n{before}\n--- End Before {key} ---")
+
+        self.run_tmux(["send-keys", "-t", self.session, key_to_send])
+        time.sleep(0.25)
+
+        if self.log_level == "DEBUG":
+            after = self.capture_pane()
+            logger.debug(f"\n--- After {key} ---\n{after}\n--- End After {key} ---")
+
+        self.capture_debug_screen(f"after_send_key_{key}")
+
     def _perform_comparison(
         self, actual: str, expected: str, operator: str, raw_expected: str = ""
     ) -> bool:
@@ -278,7 +300,11 @@ class RobotEngine:
                 if "{{" in raw_expected:
                     source = f"run time variable '{raw_expected}'"
                 else:
-                    source = f"expected value '{raw_expected}'" if raw_expected else "expected value"
+                    source = (
+                        f"expected value '{raw_expected}'"
+                        if raw_expected
+                        else "expected value"
+                    )
                 raise TerminationException(
                     f"Compare data is incompatible: The {source} resolved to '{expected}', which is not numeric for operator {operator}"
                 )
@@ -717,25 +743,16 @@ class RobotEngine:
         if isinstance(step, SendTextAction):
             text = self._substitute_runtime_vars(step.text)
             self.run_tmux(["send-keys", "-l", "-t", self.session, text])
+            if step.key:
+                # Delay after text before first key
+                time.sleep(0.25)
+                keys = [step.key] if isinstance(step.key, str) else step.key
+                for k in keys:
+                    substituted_key = self._substitute_runtime_vars(k)
+                    self._send_single_key(substituted_key)
         elif isinstance(step, SendKeyAction):
             key = self._substitute_runtime_vars(step.key)
-            key_to_send = KEY_MAP.get(key, key)
-            logger.debug(f"[Key Send] Sending key: '{key}' -> tmux: '{key_to_send}'")
-
-            if self.log_level == "DEBUG":
-                before = self.capture_pane()
-                logger.debug(
-                    f"\n--- Before {key} ---\n{before}\n--- End Before {key} ---"
-                )
-
-            self.run_tmux(["send-keys", "-t", self.session, key_to_send])
-            time.sleep(0.25)
-
-            if self.log_level == "DEBUG":
-                after = self.capture_pane()
-                logger.debug(f"\n--- After {key} ---\n{after}\n--- End After {key} ---")
-
-            self.capture_debug_screen(f"after_send_key_{key}")
+            self._send_single_key(key)
         elif isinstance(step, SleepAction):
             time.sleep(step.seconds)
         elif isinstance(step, CaptureAction):
@@ -980,9 +997,7 @@ class RobotEngine:
                 if not is_block:
                     lines = last_content.splitlines()
                     actual_value = ""
-                    search_texts = (
-                        [text] if isinstance(text, str) else text
-                    )
+                    search_texts = [text] if isinstance(text, str) else text
                     max_len = max((len(t) for t in search_texts), default=0)
 
                     if step.is_message_line:
