@@ -75,8 +75,8 @@ class LogMasker:
             )
             # Masking for "Executing: tn5250 ... <hostname> with window size ..."
             masked_message = re.sub(
-                r"(Executing:\s+tn5250\s+.*?ssl:)[^\s:]+:(\d+)(\s+with window size)",
-                r"\1********:[MASKED_PORT]\3",
+                r"(Executing:\s+tn5250\s+.*?)(?:ssl:)?([^\s:]+)(?::(\d+))?(\s+with window size)",
+                r"\1[MASKED_HOST]\4",
                 masked_message,
             )
 
