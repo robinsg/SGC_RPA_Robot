@@ -14,9 +14,7 @@ jobs:
     runs-on: [self-hosted, linux, ibm-i-runner]
     strategy:
       matrix:
-        ###  test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
-        test-variant: ["t-direct"]
-
+        test-variant: ["a-hmc", "t-direct", "e-hmc", "b-direct"]
       fail-fast: false
 
     steps:
