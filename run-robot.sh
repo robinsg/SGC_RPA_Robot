@@ -117,45 +117,8 @@ log_message() {
     echo "${timestamp},${LPAR_NAME_LOWER},BASH: ${message}" >> "$log_file"
 
     # Also print the message to the console (potentially masked)
-    local masked_message="$message"
-    local github_actions
-    github_actions=$(echo "${GITHUB_ACTIONS:-}" | tr '[:upper:]' '[:lower:]')
-    local log_level
-    log_level=$(echo "${LOG_LEVEL:-INFO}" | tr '[:upper:]' '[:lower:]')
-
-    if [[ "$github_actions" == "true" && "$log_level" == "debug" ]]; then
-        # Masking for parameters
-        masked_message=$(echo "$masked_message" | sed -E 's/(--yaml-file|-f|-y) +[^ ]+/--yaml-file [MASKED_YAML_FILE]/g')
-        masked_message=$(echo "$masked_message" | sed -E 's/(--host|-h) +[^ ]+/--host [MASKED_HOST]/g')
-        masked_message=$(echo "$masked_message" | sed -E 's/(--env|-e) +[^ ]+/--env [MASKED_ENV_FILE]/g')
-
-        # Masking for "Loading environment variables from ..."
-        masked_message=$(echo "$masked_message" | sed -E 's/(Loading environment variables from )[^ ]+/\1[MASKED_ENV_FILE]/g')
-
-        # Masking for "Testing connectivity to host:port"
-        masked_message=$(echo "$masked_message" | sed -E 's/(Testing connectivity to )[^:]+:[0-9]+/\1[MASKED_HOST]:[MASKED_PORT]/g')
-
-        # Masking for session name and host
-        masked_message=$(echo "$masked_message" | sed -E "s/(Starting new TN5250 session ')[^']+' for host: [^ ]+/\1[MASKED_SESSION_NAME]' for host: [MASKED_HOST]/g")
-
-        # Masking for tn5250 command (direct connection)
-        # Use a non-greedy approach by matching characters until the last space before 'with window size'
-        masked_message=$(echo "$masked_message" | sed -E 's/(Executing: tn5250 .*) ([^ ]+) (with window size)/\1 [MASKED_HOST] \3/g')
-
-        # Masking for tn5250 command (HMC connection)
-        masked_message=$(echo "$masked_message" | sed -E 's/(Executing: tn5250 ssl:)[^:]+:[0-9]+/\1[MASKED_HOST]:[MASKED_PORT]/g')
-
-        # Masking for HMC connection port
-        masked_message=$(echo "$masked_message" | sed -E 's/(Connecting via HMC Proxy on port )[0-9]+/\1[MASKED_PORT]/g')
-
-        # Masking for tmux session termination messages
-        masked_message=$(echo "$masked_message" | sed -E "s/(Terminating tmux session:? (robot-)?'?)robot-[^ '.]+/\1robot-[MASKED_HOST]/g")
-
-        # Masking for already terminated sessions
-        masked_message=$(echo "$masked_message" | sed -E "s/(Session 'robot-)[^']+/\1[MASKED_HOST]/g")
-    fi
-
-    echo "${masked_message}"
+    # Use the Python-based masking utility for consistent and robust masking.
+    PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.masker "$message"
 }
 
 # Logs a sensitive message based on the current LOG_LEVEL.
