@@ -106,13 +106,18 @@ class LogMasker:
                     flags=re.IGNORECASE,
                 )
 
-                # Masking for screen title LPAR name
-                masked_message = re.sub(
-                    rf"(\[Screen\].*?)\s+{re.escape(lpar_name)}\b",
-                    r"\1 ***",
-                    masked_message,
-                    flags=re.IGNORECASE,
-                )
+            # Masking for HMC_HOST
+            hmc_host = os.environ.get("HMC_HOST", "")
+            if hmc_host:
+                masked_message = masked_message.replace(hmc_host, "[MASKED_HOST]")
+
+            # Masking for screen title LPAR name
+            masked_message = re.sub(
+                rf"(\[Screen\].*?)\s+{re.escape(lpar_name)}\b",
+                r"\1 ***",
+                masked_message,
+                flags=re.IGNORECASE,
+            )
 
             # Masking for capture file paths (simplify to filename)
             masked_message = re.sub(

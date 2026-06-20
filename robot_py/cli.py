@@ -69,6 +69,11 @@ def main():
     parser.add_argument(
         "-e", "--env", help="Path to the environment file", required=False
     )
+    parser.add_argument(
+        "--dry-run",
+        help="Run the engine without interacting with tmux",
+        action="store_true",
+    )
 
     args = parser.parse_args()
     yaml_arg = args.yaml_file
@@ -84,7 +89,7 @@ def main():
             load_env_file(env_arg)
 
         yaml_path = os.path.abspath(yaml_arg)
-        engine = RobotEngine(yaml_path)
+        engine = RobotEngine(yaml_path, dry_run=args.dry_run)
         engine.run()
     except Exception as e:
         logger.error(f"Error: {str(e)}")

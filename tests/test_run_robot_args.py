@@ -164,23 +164,93 @@ def test_env_arg_success(tmp_path):
         os.chdir(original_cwd)
 
 
-def test_debug_log_level(tmp_path):
+def test_debug_log_level_masked(tmp_path):
+    """Verify masking when GITHUB_ACTIONS=true and LOG_LEVEL=debug."""
     yaml_file = tmp_path / "test.yaml"
-    yaml_file.write_text("name: test")
+    yaml_file.write_text("name: test\nsteps: []")
     env_file = tmp_path / ".env.debug"
-    env_file.write_text("TN5250_USER=test\nTN5250_PASSWORD=test\nLOG_LEVEL=debug")
+    # Provide all required vars to avoid engine validation errors
+    env_file.write_text(
+        "TN5250_USER=test\n"
+        "TN5250_PASSWORD=test\n"
+        "LOG_LEVEL=debug\n"
+        "HMC_HOST=hmchost\n"
+        "HMC_USER=user\n"
+        "HMC_PWD=pwd\n"
+        "HMC_SYSNAME=sys\n"
+        "HMC_LPARNAME=lpar\n"
+        "HMC_SESSION_KEY=key"
+    )
 
-    # Change CWD to tmp_path to run the script
     original_cwd = os.getcwd()
     os.chdir(tmp_path)
     try:
         script_path = os.path.join(original_cwd, "run-robot.sh")
         result = subprocess.run(
-            [script_path, "-f", "test.yaml", "-h", "debughost", "-e", ".env.debug"],
+            [
+                script_path,
+                "-f",
+                "test.yaml",
+                "-h",
+                "debughost",
+                "-e",
+                ".env.debug",
+                "--dry-run",
+            ],
             capture_output=True,
             text=True,
-            env={**os.environ, "LOG_LEVEL": "debug"},
+            env={
+                **os.environ,
+                "LOG_LEVEL": "debug",
+                "GITHUB_ACTIONS": "true",
+            },
         )
+        # Verify masking of env file, host, and port
+        assert "Loading environment variables from [MASKED_ENV_FILE]" in result.stdout
+        assert "Dry run mode enabled. Skipping connectivity check." in result.stdout
+        # Verify HMC host masking (as it was set in .env.debug)
+        assert "hmchost" not in result.stdout
+        # Verify debughost masking
+        assert "debughost" not in result.stdout
+        # In dry run mode, [MASKED_HOST] appears in the Python parameters log (stderr)
+        assert "[MASKED_HOST]" in result.stderr
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_debug_log_level_unmasked(tmp_path):
+    """Verify no masking when GITHUB_ACTIONS=false and LOG_LEVEL=debug."""
+    yaml_file = tmp_path / "test.yaml"
+    yaml_file.write_text("name: test\nsteps: []")
+    env_file = tmp_path / ".env.debug"
+    env_file.write_text("TN5250_USER=test\nTN5250_PASSWORD=test\nLOG_LEVEL=debug")
+
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        script_path = os.path.join(original_cwd, "run-robot.sh")
+        result = subprocess.run(
+            [
+                script_path,
+                "-f",
+                "test.yaml",
+                "-h",
+                "debughost",
+                "-e",
+                ".env.debug",
+                "--dry-run",
+            ],
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "LOG_LEVEL": "debug",
+                "GITHUB_ACTIONS": "false",
+            },
+        )
+        # Verify NO masking
         assert "Loading environment variables from .env.debug" in result.stdout
+        assert "Dry run mode enabled. Skipping connectivity check." in result.stdout
+        assert "debughost" in result.stderr
     finally:
         os.chdir(original_cwd)

@@ -17,6 +17,7 @@ usage() {
     echo "  -f, --yaml-file <path>    Path to the YAML automation script"
     echo "  -h, --host <name>         LPAR host name (e.g., pub400.com)"
     echo "  -e, --env <path>          Path to the environment file (must start with '.env')"
+    echo "  --dry-run                 Run the script without connecting to a host"
     echo "  --help                    Show this help message and exit"
     echo ""
     echo "Example:"
@@ -27,6 +28,7 @@ usage() {
 YAML_FILE=""
 LPAR_NAME=""
 ENV_FILE_ARG=""
+DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -59,6 +61,10 @@ while [[ $# -gt 0 ]]; do
                 usage
                 exit 1
             fi
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
             ;;
         --help)
             usage
@@ -213,14 +219,18 @@ else
     fi
 fi
 
-log_sensitive "Testing connectivity to ${CHECK_HOST}:${CHECK_PORT}..." "Testing connectivity"
-# timeout 2s, 2>/dev/null to suppress 'connection refused' bash errors
-if ! timeout 2 bash -c "true > /dev/tcp/${CHECK_HOST}/${CHECK_PORT}" 2>/dev/null; then
-    log_message "Error: Port ${CHECK_PORT} on host ${CHECK_HOST} is not reachable."
-    log_message "Ensure your VPN is connected or the target system is up."
-    exit 1
+if [ "$DRY_RUN" = true ]; then
+    log_message "Dry run mode enabled. Skipping connectivity check."
+else
+    log_sensitive "Testing connectivity to ${CHECK_HOST}:${CHECK_PORT}..." "Testing connectivity"
+    # timeout 2s, 2>/dev/null to suppress 'connection refused' bash errors
+    if ! timeout 2 bash -c "true > /dev/tcp/${CHECK_HOST}/${CHECK_PORT}" 2>/dev/null; then
+        log_message "Error: Port ${CHECK_PORT} on host ${CHECK_HOST} is not reachable."
+        log_message "Ensure your VPN is connected or the target system is up."
+        exit 1
+    fi
+    log_message "Connectivity test passed."
 fi
-log_message "Connectivity test passed."
 
 # Unconditionally set the session name based on the host. This prevents
 # a value from the .env file from causing a mismatch.
@@ -267,33 +277,38 @@ if ! command -v tmux &> /dev/null; then
     exit 1
 fi
 
-# Ensure a clean state by terminating any existing session with this name.
-# This prevents "hanging" sessions from causing state-related failures.
-if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
-    log_message "Existing session '$TMUX_SESSION' found. Terminating it to ensure a clean start."
-    tmux kill-session -t "$TMUX_SESSION"
-    # Brief pause to allow the system to reap the processes
-    sleep 1
+if [ "$DRY_RUN" = true ]; then
+    log_message "Dry run mode enabled. Skipping tmux session creation."
+    SESSION_CREATED_BY_SCRIPT=false
+else
+    # Ensure a clean state by terminating any existing session with this name.
+    # This prevents "hanging" sessions from causing state-related failures.
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        log_message "Existing session '$TMUX_SESSION' found. Terminating it to ensure a clean start."
+        tmux kill-session -t "$TMUX_SESSION"
+        # Brief pause to allow the system to reap the processes
+        sleep 1
+    fi
+
+    # Track if this script instance created the session (now effectively always true)
+    SESSION_CREATED_BY_SCRIPT=true
+    log_sensitive "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST" "Starting new TN5250 session"
+    log_sensitive "Executing: ${FULL_CMD[*]} with window size ${TMUX_SIZE[*]}" "Executing tn5250 command"
+    tmux new-session -d -s "$TMUX_SESSION" "${TMUX_SIZE[@]}" "${FULL_CMD[@]}"
+
+    # Robustness Check: Wait a moment and verify the session started.
+    # A longer delay helps prevent a race condition where the python script
+    # starts before tn5250 has connected or had a chance to fail.
+    sleep 2
+
+    if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        log_message "Error: Failed to start tmux session '$TMUX_SESSION'."
+        log_message "This is often caused by an invalid hostname or tn5250 command error."
+        log_message "Please check the hostname in your .env file and the tn5250 installation."
+        exit 1
+    fi
+    log_message "Session started successfully."
 fi
-
-# Track if this script instance created the session (now effectively always true)
-SESSION_CREATED_BY_SCRIPT=true
-log_sensitive "Starting new TN5250 session '$TMUX_SESSION' for host: $TN5250_HOST" "Starting new TN5250 session"
-log_sensitive "Executing: ${FULL_CMD[*]} with window size ${TMUX_SIZE[*]}" "Executing tn5250 command"
-tmux new-session -d -s "$TMUX_SESSION" "${TMUX_SIZE[@]}" "${FULL_CMD[@]}"
-
-# Robustness Check: Wait a moment and verify the session started.
-# A longer delay helps prevent a race condition where the python script
-# starts before tn5250 has connected or had a chance to fail.
-sleep 2
-
-if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
-    log_message "Error: Failed to start tmux session '$TMUX_SESSION'."
-    log_message "This is often caused by an invalid hostname or tn5250 command error."
-    log_message "Please check the hostname in your .env file and the tn5250 installation."
-    exit 1
-fi
-log_message "Session started successfully."
 
 
 # Export the session name so the robot knows which session to target
@@ -302,7 +317,11 @@ export TMUX_SESSION
 # Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
 set +e
 log_message "--- Starting RPA Automation (Python) ---"
-PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" python3 -m robot_py.cli --yaml-file "$YAML_FILE" --env "$ENV_FILE"
+CLI_ARGS=("--yaml-file" "$YAML_FILE" "--env" "$ENV_FILE")
+if [ "$DRY_RUN" = true ]; then
+    CLI_ARGS+=("--dry-run")
+fi
+PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" python3 -m robot_py.cli "${CLI_ARGS[@]}"
 EXIT_CODE=$?
 set -e # Re-enable exit on error
 

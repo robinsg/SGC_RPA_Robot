@@ -139,17 +139,19 @@ class RobotEngine:
         max_cols: Maximum columns for the terminal device type.
     """
 
-    def __init__(self, yaml_path: str):
+    def __init__(self, yaml_path: str, dry_run: bool = False):
         """Initialize the RobotEngine.
 
         Args:
             yaml_path: Path to the YAML script file.
+            dry_run: Whether to run in dry-run mode (skipping tmux).
 
         Raises:
             ValueError: If the environment is invalid or the device type is unsupported.
         """
         validate_environment()
         self.script = parse_robot_script(yaml_path)
+        self.dry_run = dry_run
         self.session = os.environ.get("TMUX_SESSION", self.script.tmux_session)
         self.host = os.environ.get("TN5250_HOST", "unknown_host")
         self.log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -205,6 +207,15 @@ class RobotEngine:
         Raises:
             RuntimeError: If the tmux session does not exist or the command fails.
         """
+        if self.dry_run:
+            logger.debug(f"[Dry Run] Would execute: tmux {' '.join(args)}")
+            # Return empty or placeholder content for dry run
+            if "capture-pane" in args:
+                return "Dry Run Screen Content"
+            if "display-message" in args:
+                return "0,0"
+            return ""
+
         # Always check if the tmux session exists before attempting any command.
         if not self.check_session_exists():
             raise RuntimeError(f"Tmux session '{self.session}' not found.")
@@ -226,6 +237,8 @@ class RobotEngine:
         Returns:
             True if the session exists, False otherwise.
         """
+        if self.dry_run:
+            return True
         result = subprocess.run(
             ["tmux", "has-session", "-t", self.session], capture_output=True
         )
@@ -233,6 +246,10 @@ class RobotEngine:
 
     def terminate_session(self):
         """Kill the tmux session associated with this robot."""
+        if self.dry_run:
+            logger.info(f"[Dry Run] Would terminate tmux session: {self.session}")
+            return
+
         if self.check_session_exists():
             logger.info(f"Terminating tmux session: {self.session}")
             subprocess.run(
@@ -702,7 +719,7 @@ class RobotEngine:
         Args:
             action_name: A name for the capture, used in the filename.
         """
-        if self.log_level != "DEBUG":
+        if self.log_level != "DEBUG" or self.dry_run:
             return
         try:
             pane_content = self.capture_pane()
@@ -756,6 +773,9 @@ class RobotEngine:
         elif isinstance(step, SleepAction):
             time.sleep(step.seconds)
         elif isinstance(step, CaptureAction):
+            if self.dry_run:
+                logger.info("[Dry Run] Would capture screen to file.")
+                return
             current_screen_content = self.capture_pane()
             timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
             host_dir = os.path.join(os.getcwd(), "captures", self.host)
@@ -1058,6 +1078,8 @@ class RobotEngine:
             logger.info(f"Automation terminated: {str(e)}")
         except Exception as e:
             logger.error(f"Error during automation: {str(e)}")
+            if self.dry_run:
+                raise
             try:
                 error_pane_content = self.capture_pane()
                 timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
