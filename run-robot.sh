@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # --- Logging Setup ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="logs"
 DEBUG_CAPTURE_DIR="logs/captures"
 mkdir -p "$LOG_DIR"
@@ -118,7 +119,7 @@ log_message() {
 
     # Also print the message to the console (potentially masked)
     # Use the Python-based masking utility for consistent and robust masking.
-    PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.masker "$message"
+    PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" python3 -m robot_py.masker "$message"
 }
 
 # Logs a sensitive message based on the current LOG_LEVEL.
@@ -301,7 +302,7 @@ export TMUX_SESSION
 # Run the robot engine, but temporarily disable 'exit on error' to handle cleanup
 set +e
 log_message "--- Starting RPA Automation (Python) ---"
-PYTHONPATH=".:${PYTHONPATH:-}" python3 -m robot_py.cli --yaml-file "$YAML_FILE" --env "$ENV_FILE"
+PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" python3 -m robot_py.cli --yaml-file "$YAML_FILE" --env "$ENV_FILE"
 EXIT_CODE=$?
 set -e # Re-enable exit on error
 

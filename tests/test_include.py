@@ -1,7 +1,5 @@
-import pytest
-import os
-import yaml
 from robot_py.schema import parse_robot_script, SendTextAction, WaitForTextAction
+
 
 def test_parse_robot_script_with_include(tmp_path):
     common_yaml = tmp_path / "common.yaml"
@@ -31,6 +29,7 @@ steps:
     assert isinstance(script.steps[2], SendTextAction)
     assert script.steps[2].text == "password"
 
+
 def test_nested_include(tmp_path):
     inner_yaml = tmp_path / "inner.yaml"
     inner_yaml.write_text("""
@@ -57,6 +56,7 @@ steps:
     assert script.steps[0].text == "outer"
     assert script.steps[1].text == "inner"
 
+
 def test_include_env_substitution(tmp_path, monkeypatch):
     monkeypatch.setenv("TEST_USER", "robot_user")
 
@@ -75,6 +75,7 @@ steps:
 
     script = parse_robot_script(str(main_yaml))
     assert script.steps[0].text == "robot_user"
+
 
 def test_top_level_include_inheritance(tmp_path):
     parent_yaml = tmp_path / "parent.yaml"
@@ -102,6 +103,7 @@ steps:
     assert len(script.steps) == 2
     assert script.steps[0].text == "Parent Step"
     assert script.steps[1].text == "Child Step"
+
 
 def test_relative_include_resolution(tmp_path):
     subdir = tmp_path / "subdir"

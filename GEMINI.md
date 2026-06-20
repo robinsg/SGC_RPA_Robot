@@ -13,7 +13,7 @@ This project is an RPA (Robotic Process Automation) engine for IBM i (AS/400) sy
 - **Coordinate System:** 5250 coordinates are 1-indexed (Row 1-24/27, Col 1-80/132). Always verify coordinates against standard IBM i layouts.
 - **Valid Actions:** Only use supported actions:
   - `wait_for_text`: Waits for text to appear (optionally at specific coordinates).
-  - `send_text`: Sends a string of text.
+  - `send_text`: Sends a string of text. Supports an optional `key` (string or list of strings) to be sent after the text with a 0.25s delay.
   - `send_key`: Sends a special key (e.g., `Enter`, `F3`).
   - `sleep`: Pauses for a specified number of seconds.
   - `capture`: Saves a screen capture to a file.
