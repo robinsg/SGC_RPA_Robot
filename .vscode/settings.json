@@ -1,44 +1,23 @@
 {
-  // --- YAML Schemas ---
-  // Removed the 'continue' extension schema entry as it is not relevant here.
   "yaml.schemas": {
+    "https://raw.githubusercontent.com/continuedev/continue/main/schema/config.yaml.json": [
+      "~/.continue/config.json"
+    ],
+    // Recommended: Add a schema for your robot's YAML files for autocompletion and validation.
+    // You would need to generate this JSON schema from your Zod schema in src/robot/schema.ts
     "./schemas/robot.schema.json": ["*.yaml", "!example_script.yaml"]
   },
   "yaml.schemaStore.enable": false,
 
-  // --- General Editor Settings ---
+  // --- Recommended General & TypeScript Settings ---
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
 
-  // --- Inline Suggestions (required for Gemini ghost text to appear) ---
-  "editor.inlineSuggest.enabled": true,
-
-  // --- Word-based suggestions: off to keep completions clean ---
-  // VS Code's built-in word-matching suggestions can clutter the list
-  // alongside Gemini. Turn off if you want Gemini as the sole source.
-  "editor.wordBasedSuggestions": "off",
-
-  // Remove this — showing word suggestions conflicts with the above.
-  // "editor.suggest.showWords": true   <-- removed
-
-  // --- Gemini Code Assist ---
-  // This is the correct key for enabling Gemini inline completions.
-  "cloudcode.duetAI.inlineCompletion.enable": true,
-
-  // --- Cline ---
-  // Cline has NO inline completion provider — it never supplies ghost text
-  // or autocomplete. No settings are needed to disable something it doesn't do.
-  // All three "cline.completions.*" keys in your original file were invalid
-  // and have been removed.
-
-  // --- GitHub Copilot (belt-and-braces since extension is disabled) ---
-  "github.copilot.enable": { "*": false },
-  "github.copilot.inlineSuggest.enable": false,
-
   // --- File & Search Exclusions ---
+  // Hides clutter from the file explorer
   "files.exclude": {
     "**/.git": true,
     "node_modules/": true,
@@ -46,14 +25,13 @@
     "build/": true,
     "coverage/": true
   },
+  // Excludes clutter from search results
   "search.exclude": {
     "**/node_modules": true,
     "dist/": true,
     "build/": true,
     "coverage/": true
   },
-
-  // --- Python Testing ---
   "python.testing.pytestArgs": ["tests"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true

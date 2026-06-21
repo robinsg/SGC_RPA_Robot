@@ -1,4 +1,5 @@
 #!/QOpenSys/usr/bin/bash
+set -euo pipefail
 
 # robot_client.sh
 # This script is intended to be run in the IBM i PASE environment.

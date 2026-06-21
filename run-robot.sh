@@ -77,12 +77,10 @@ cleanup_and_exit() {
         LAST_SCREEN=""
         if [ -f "$LOG_FILE_ABS" ]; then
             # Look for lines containing "[Screen]" and take the last one.
-            # Extract the last screen title and escape quotes for JSON.
-            LAST_SCREEN_RAW=$(grep "\[Screen\]" "$LOG_FILE_ABS" | tail -n 1)
-            # Remove everything up to and including the literal "[Screen] " prefix
-            LAST_SCREEN_RAW=${LAST_SCREEN_RAW##*\[Screen\] }
-            # Escape double quotes for safe JSON embedding
-            LAST_SCREEN=${LAST_SCREEN_RAW//\"/\\\"}
+            # We use sed to extract everything after "[Screen] " and then
+            # we need to escape double quotes for the JSON.
+            LAST_SCREEN_RAW=$(grep "\[Screen\]" "$LOG_FILE_ABS" | tail -n 1 | sed 's/.*\[Screen\] //')
+            LAST_SCREEN="${LAST_SCREEN_RAW//\"/\\\"}"
         fi
 
         # Generate JSON output to stdout
