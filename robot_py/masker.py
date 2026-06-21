@@ -134,17 +134,19 @@ class LogMasker:
             )
 
         # Mask sensitive environment variables (Always active)
-        sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
-        custom_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
-        if custom_sensitive:
-            sensitive_vars.extend(
-                [v.strip() for v in custom_sensitive.split(",") if v.strip()]
-            )
+        # Only mask sensitive environment variables if _should_mask() is true
+        if cls._should_mask():
+            sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
+            custom_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
+            if custom_sensitive:
+                sensitive_vars.extend(
+                    [v.strip() for v in custom_sensitive.split(",") if v.strip()]
+                )
 
-        for var_name in sensitive_vars:
-            val = os.environ.get(var_name)
-            if val:
-                masked_message = masked_message.replace(val, "********")
+            for var_name in sensitive_vars:
+                val = os.environ.get(var_name)
+                if val:
+                    masked_message = masked_message.replace(val, "********")
 
         return masked_message
 

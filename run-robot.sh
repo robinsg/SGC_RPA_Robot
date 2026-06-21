@@ -118,8 +118,12 @@ log_message() {
     echo "${timestamp},${LPAR_NAME_LOWER},BASH: ${message}" >> "$log_file"
 
     # Also print the message to the console (potentially masked)
-    # Use the Python-based masking utility for consistent and robust masking.
-    PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" python3 -m robot_py.masker "$message"
+    # Conditionally apply masking based on GITHUB_ACTIONS and LOG_LEVEL.
+    if [[ "${GITHUB_ACTIONS:-}" = "true" ]] && [[ "${LOG_LEVEL:-}" = "debug" ]]; then
+        PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" python3 -m robot_py.masker "$message"
+    else
+        echo "$message"
+    fi
 }
 
 # Logs a sensitive message based on the current LOG_LEVEL.
