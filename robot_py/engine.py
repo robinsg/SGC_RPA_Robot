@@ -140,7 +140,7 @@ class RobotEngine:
     """
 
     def __init__(self, yaml_path: str, dry_run: bool = False):
-        """Initialize the RobotEngine.
+        """Initialise the RobotEngine.
 
         Args:
             yaml_path: Path to the YAML script file.
@@ -156,7 +156,7 @@ class RobotEngine:
         self.host = os.environ.get("TN5250_HOST", "unknown_host")
         self.log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
         self.last_logged_title = ""
-        self.history_screens: List[str] = []  # Initialize screen history
+        self.history_screens: List[str] = []  # Initialise screen history
         self.runtime_variables: Dict[str, str] = {
             k: str(v) for k, v in os.environ.items()
         }
