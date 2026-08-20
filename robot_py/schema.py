@@ -350,7 +350,7 @@ class RobotLoader(yaml.SafeLoader):
     """
 
     def __init__(self, stream: Any):
-        """Initialize the loader and set the root directory.
+        """Initialise the loader and set the root directory.
 
         Args:
             stream: The input stream (file object).

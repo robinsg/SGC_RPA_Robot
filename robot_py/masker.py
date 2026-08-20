@@ -106,6 +106,12 @@ class LogMasker:
                     flags=re.IGNORECASE,
                 )
 
+            # Masking for HMC_HOST
+            hmc_host = os.environ.get("HMC_HOST", "")
+            if hmc_host:
+                masked_message = masked_message.replace(hmc_host, "[MASKED_HOST]")
+
+            if lpar_name:
                 # Masking for screen title LPAR name
                 masked_message = re.sub(
                     rf"(\[Screen\].*?)\s+{re.escape(lpar_name)}\b",

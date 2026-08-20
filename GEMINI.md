@@ -112,7 +112,7 @@ def load_script(path: str) -> dict:
 ### Testing
 
 - Tests live in `tests/` and mirror the structure of `robot_py/`.
-- This project interacts with live `libtmux` sessions — unit tests must mock `libtmux` using `unittest.mock` or `pytest-mock`. Do not write tests that require a live terminal session.
+- Unit tests must mock external processes or tmux interactions using `unittest.mock`, `pytest-mock`, or dry-run mode. Do not write tests that require a live terminal session.
 - Use `pytest` as the test runner.
 
 Example test structure:
