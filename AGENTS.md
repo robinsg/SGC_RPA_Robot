@@ -61,7 +61,7 @@ The repo structure is intentional. **Never reorganise it.**
 ### Testing
 
 - Tests live in `tests/`, mirroring the structure of `robot_py/`.
-- Because this project uses live `libtmux` sessions, unit tests must mock `libtmux` using `unittest.mock` or `pytest-mock`. Never write tests that require a live terminal or real IBM i connection.
+- Unit tests must mock external processes or tmux interactions using `unittest.mock`, `pytest-mock`, or dry-run mode. Never write tests that require a live terminal or real IBM i connection.
 - Use `pytest` as the test runner.
 
 ## GitHub Actions Compliance
