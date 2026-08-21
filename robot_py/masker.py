@@ -133,20 +133,32 @@ class LogMasker:
                 masked_message,
             )
 
-        # Mask sensitive environment variables (Always active)
-        # Only mask sensitive environment variables if _should_mask() is true
-        if cls._should_mask():
-            sensitive_vars = ["TN5250_PASSWORD", "HMC_PWD"]
-            custom_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
-            if custom_sensitive:
-                sensitive_vars.extend(
-                    [v.strip() for v in custom_sensitive.split(",") if v.strip()]
-                )
+        # Identify and mask sensitive environment variables (Always active)
+        sensitive_vars = set()
+        custom_sensitive = os.environ.get("ROBOT_SENSITIVE_VARS", "")
+        if custom_sensitive:
+            for v in custom_sensitive.split(","):
+                if v.strip():
+                    sensitive_vars.add(v.strip())
 
-            for var_name in sensitive_vars:
-                val = os.environ.get(var_name)
-                if val:
-                    masked_message = masked_message.replace(val, "********")
+        # Scan os.environ for any variables using Secret(...) format
+        for key, val in list(os.environ.items()):
+            if isinstance(val, str) and val.startswith("Secret(") and val.endswith(")"):
+                inner_val = val[7:-1].strip().strip("\"'")
+                # Mask raw Secret(...) string if present in message
+                masked_message = masked_message.replace(val, "********")
+                # Update os.environ with unmasked value and track sensitive key
+                os.environ[key] = inner_val
+                sensitive_vars.add(key)
+
+        if sensitive_vars:
+            os.environ["ROBOT_SENSITIVE_VARS"] = ",".join(sorted(sensitive_vars))
+
+        # Mask actual secret values in the message
+        for var_name in sensitive_vars:
+            val = os.environ.get(var_name)
+            if val:
+                masked_message = masked_message.replace(val, "********")
 
         return masked_message
 

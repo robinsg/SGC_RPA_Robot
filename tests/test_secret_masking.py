@@ -29,11 +29,10 @@ def test_secret_parsing(tmp_path):
 def test_masking_logic(monkeypatch):
     monkeypatch.setenv("MY_SECRET", "password123")
     monkeypatch.setenv("ROBOT_SENSITIVE_VARS", "MY_SECRET")
-    monkeypatch.setenv("TN5250_PASSWORD", "hardcoded_secret")
 
     formatter = CustomFormatter()
 
-    # Test custom secret masking
+    # Test secret masking for variables in ROBOT_SENSITIVE_VARS
     record = logging.LogRecord(
         "robot", logging.INFO, "test.py", 10, "Value is password123", None, None
     )
@@ -41,15 +40,17 @@ def test_masking_logic(monkeypatch):
     assert "password123" not in formatted
     assert "********" in formatted
 
-    # Test hardcoded secret masking (backward compatibility)
+    # Test dynamic detection and masking of Secret() keyword in os.environ
+    monkeypatch.setenv("HMC_SESSION_KEY", 'Secret("abc1234")')
     record2 = logging.LogRecord(
-        "robot", logging.INFO, "test.py", 10, "Password is hardcoded_secret", None, None
+        "robot", logging.INFO, "test.py", 10, "Session key is abc1234", None, None
     )
     formatted2 = formatter.format(record2)
-    assert "hardcoded_secret" not in formatted2
+    assert "abc1234" not in formatted2
     assert "********" in formatted2
+    assert os.environ.get("HMC_SESSION_KEY") == "abc1234"
 
-    # Test non-sensitive var NOT masked
+    # Test non-sensitive var NOT masked when not in ROBOT_SENSITIVE_VARS
     monkeypatch.setenv("NORMAL_VAR", "normal_value")
     record3 = logging.LogRecord(
         "robot", logging.INFO, "test.py", 10, "Value is normal_value", None, None
